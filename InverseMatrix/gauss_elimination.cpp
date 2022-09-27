@@ -5,9 +5,31 @@
 #include <boost/numeric/ublas/lu.hpp>
 #include <boost/spirit/include/karma.hpp>
 #include <boost/multi_array.hpp>
-
 #include <iostream>
+#include <cstddef>
+#include "log.hpp"
 
+BOOST_LOG_GLOBAL_LOGGER_DEFAULT(user::log::main, boost::log::sources::severity_logger_mt< >)
+boost::log::sources::severity_logger_mt< >& main_log = user::log::main::get();
+
+namespace logging = boost::log;
+namespace expr = boost::log::expressions;
+namespace keywords = boost::log::keywords;
+void log_init()
+{
+    logging::add_console_log
+    (
+        std::clog,
+        keywords::format =
+        (
+            expr::stream
+                << "> \n" << expr::smessage
+        )
+    );
+
+    user::log::set_severity_level(1);
+}
+//
 using namespace boost::numeric::ublas;
 namespace karma = boost::spirit::karma;
 
@@ -29,13 +51,30 @@ void subtract_row(boost::numeric::ublas::matrix<T>& A,
 {
     int col = A.size2();
     if(factor == 0 ) return;
-    std::cout << "Row(" << j+1 << ") - " 
-    <<"(" << factor << ")" <<  "*Row(" << i+1 << ")" << std::endl;
+    BOOST_LOG_SEV(main_log, 0) << "Row(" << j+1 << ") - " 
+    <<"(" << factor << ")" <<  "*Row(" << i+1 << ")" ;
     for(int k = 0; k < col; k++){
         A(j,k) = A(j,k) - A(i,k)*factor;
         if(A.size2() == A.size1())
             inv(j,k) = inv(j,k) - inv(i,k)*factor;
     } 
+}
+
+template<typename T>
+int find_max_row(const int srow, boost::numeric::ublas::matrix<T>& A)
+{
+    int rows = A.size1();
+    double max = std::abs<double>(A(srow, srow));
+    int max_row = srow;
+    for( int row = srow+1; row < rows; row++){
+        int i = row;
+        double abs_val = std::abs<double>(A(i, i));
+        if( abs_val  > max ){
+            max = abs_val;
+            max_row = i;
+        }
+    }
+    return max_row;
 }
 
 using namespace karma;
@@ -50,38 +89,36 @@ bool forward_elimination(boost::numeric::ublas::matrix<T>& A,
     int col = A.size2();
 
 
-    std::cout << karma::format(auto_ % '\t' % karma::eol, make_view(A)) << "\n";
+    BOOST_LOG_SEV(main_log, 0) << karma::format(auto_ % '\t' % karma::eol, make_view(A)) << "\n";
 
     for(int i=0; i < row-1; i++)
     {
-        std::cout << "pivot (" << 
-            i+1 << "," << i+1 << "): " << std::endl;
+        BOOST_LOG_SEV(main_log, 0) << "pivot (" << 
+            i+1 << "," << i+1 << "): " ;
 
-        // if the pivot is zero
-        // then row swap.
-        if(A(i,i)==0)
-        {
-            int j;
-            for(j=i+1; j < row; j++)
-            {
-                if(A(j,i)==0) continue;
-                boost::numeric::ublas::row(A, i).swap (
-                   boost::numeric::ublas::row(A,j)
-                       );
-                std::cout << "swap row " << i+1 << " <-> " << j+1 << std::endl;
-                P(j) = i;
+        // partial pivot
+        int max_row = find_max_row(i, A);
 
-                if(A.size1() == A.size2()){
-                   boost::numeric::ublas::row(inv, i).swap (
-                       boost::numeric::ublas::row(inv,j)
-                       );
-                   boost::numeric::ublas::row(LU, i).swap (
-                       boost::numeric::ublas::row(LU,j)
-                       );
-                }
-                break;
+        if( i != max_row ){
+            boost::numeric::ublas::row(A, i).swap (
+               boost::numeric::ublas::row(A, max_row)
+                   );
+            BOOST_LOG_SEV(main_log, 0) << "swap row " << i+1 << " <-> " << max_row+1 ;
+            P(i) = max_row;
+
+            if(A.size1() == A.size2()){
+               boost::numeric::ublas::row(inv, i).swap (
+                   boost::numeric::ublas::row(inv, max_row)
+                   );
+               boost::numeric::ublas::row(LU, i).swap (
+                   boost::numeric::ublas::row(LU, max_row)
+                   );
             }
-            if(j >= row) return false;
+        }
+        // pivot can't be zero
+        if(A(max_row, max_row)==0)
+        {
+            return false;
         }
 
         double pVal = A(i,i);
@@ -108,13 +145,13 @@ bool forward_elimination(boost::numeric::ublas::matrix<T>& A,
             subtract_row(A, j, i, x, inv);
         }
 
-        std::cout << "A : " << std::endl;
+        BOOST_LOG_SEV(main_log, 0) << "A : " ;
         using namespace karma;
-        std::cout << karma::format(auto_ % '\t' % karma::eol, make_view(A)) << "\n";
+        BOOST_LOG_SEV(main_log, 0) << karma::format(auto_ % '\t' % karma::eol, make_view(A)) << "\n";
         if(row != col) continue;
-        std::cout << LU << std::endl;
-        std::cout << "LU : " << std::endl;
-        std::cout << karma::format(auto_ % '\t' % karma::eol, make_view(LU)) << "\n";
+        BOOST_LOG_SEV(main_log, 0) << LU ;
+        BOOST_LOG_SEV(main_log, 0) << "LU : " ;
+        BOOST_LOG_SEV(main_log, 0) << karma::format(auto_ % '\t' % karma::eol, make_view(LU)) << "\n";
     }
 
     if(row != col ) return true;
@@ -123,15 +160,15 @@ bool forward_elimination(boost::numeric::ublas::matrix<T>& A,
         return false;
     }
 
-    std::cout << "square matrix - inversiable" << std::endl;
+    BOOST_LOG_SEV(main_log, 0) << "square matrix - inversiable" ;
 
     LU(row-1, row-1) = A(row-1, row-1);
 
-    std::cout << "A : " << std::endl;
-    std::cout << karma::format(auto_ % '\t' % karma::eol, make_view(A)) << "\n";
+    BOOST_LOG_SEV(main_log, 0) << "A : " ;
+    BOOST_LOG_SEV(main_log, 0) << karma::format(auto_ % '\t' % karma::eol, make_view(A)) << "\n";
 
-    std::cout << "LU : " << std::endl;
-    std::cout << karma::format(auto_ % '\t' % karma::eol, make_view(LU)) << "\n";
+    BOOST_LOG_SEV(main_log, 0) << "LU : " ;
+    BOOST_LOG_SEV(main_log, 0) << karma::format(auto_ % '\t' % karma::eol, make_view(LU)) << "\n";
 
     return true;
 }
@@ -157,7 +194,7 @@ bool backward_elimination(boost::numeric::ublas::matrix<T>& A,
     }
     if(col > row && pivot_c == col -1){
         // no solution
-        std::cout << "no solution" << std::endl;
+        BOOST_LOG_SEV(main_log, 3) << "no solution" ;
         return false;
     }
     if( A(row - 1, pivot_c) == 0) {
@@ -183,8 +220,8 @@ bool backward_elimination(boost::numeric::ublas::matrix<T>& A,
             }
         }
 
-        std::cout << "pivot (" << 
-            i+1 << "," << pivot_c+1 << "): " << std::endl;
+        BOOST_LOG_SEV(main_log, 0) << "pivot (" << 
+            i+1 << "," << pivot_c+1 << "): " ;
 
         //reached end of matrix.
         if(i==0) break;
@@ -195,7 +232,7 @@ bool backward_elimination(boost::numeric::ublas::matrix<T>& A,
             subtract_row(A, j, i, x, inv);
         }
 
-        std::cout << karma::format(auto_ % '\t' % karma::eol, make_view(A)) << "\n";
+        BOOST_LOG_SEV(main_log, 0) << karma::format(auto_ % '\t' % karma::eol, make_view(A)) << "\n";
     }
 
     if(pivot_c != 0) {
@@ -203,59 +240,6 @@ bool backward_elimination(boost::numeric::ublas::matrix<T>& A,
         return backward_elimination(A, pivot_c+1, pivot_c +1, inv);
     }
     return true;
-}
-
-#include<boost/tokenizer.hpp>
-
-int argParser(std::string const& s, std::vector<double>& data)
-{
-    typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-    boost::char_separator<char> row_sep(";"); 
-    boost::char_separator<char> col_sep(" "); 
-    tokenizer row_tok(s, row_sep);
-
-    std::vector<std::string> row_strs;
-    int row=0;
-    for (tokenizer::iterator tok_iter = row_tok.begin();
-            tok_iter != row_tok.end(); ++tok_iter)
-    {
-        row++;
-        row_strs.push_back(*tok_iter);
-    }
-
-    int col = 0;
-    for(auto row_str : row_strs)
-    {
-        tokenizer col_tok(row_str,  col_sep);
-        int cnt = 0;
-        for (tokenizer::iterator tok_iter = col_tok.begin();
-            tok_iter != col_tok.end(); ++tok_iter)
-        {
-            boost::char_separator<char> div_sep("/"); 
-            tokenizer div_tok(std::string(*tok_iter), div_sep);
-            tokenizer::iterator it =div_tok.begin();
-            std::string a , b;
-            a = *it;
-            it++;
-            if(it == div_tok.end()){
-                data.push_back(std::stod(*tok_iter));
-            }
-            else {
-                b = *it;
-                double val = std::stod(a) /std::stod(b);
-                data.push_back(val);
-            }
-            cnt++;
-        }
-        if(col == 0) col = cnt;
-        else if(col != cnt) {
-            std::cout << "column number not match (" 
-                << cnt << ", " << col << ")" <<  std::endl;
-            return 0;
-        }
-    }
-
-    return row;
 }
 
 #ifdef __BOOST_SPIRIT_PARSER__
@@ -311,6 +295,10 @@ int InputMatrixParse(char *input, std::vector<double>& M)
     std::ifstream fin ;
 	if(input != nullptr){
         fin = std::ifstream(input);
+        if (!fin) {
+            BOOST_LOG_SEV(main_log, 3) << std::strerror(errno) ;
+            return 0;
+        }
         in = &fin;
     }
     while(getline(*in, str)){
@@ -320,14 +308,14 @@ int InputMatrixParse(char *input, std::vector<double>& M)
             if(in->eof())
                 break;
             else{
-                std::cout << "broken pipe\n";
+                BOOST_LOG_SEV(main_log, 3) << "broken pipe\n";
                 return 0;
             }
         }
 #ifdef __BOOST_SPIRIT_PARSER__
         if(!client::parse_numbers(str.begin(), str.end(), M))
         {
-            std::cout << "Invalid Data: " << str << std::endl;
+            BOOST_LOG_SEV(main_log, 3) << "Invalid Data: " << str ;
             return 0;
 
         }
@@ -340,21 +328,14 @@ int InputMatrixParse(char *input, std::vector<double>& M)
 	try{
 		 dvect = reader.eval();
 	}  catch (std::invalid_argument &e) {
-		std::cerr << e.what() << std::endl;
-		return 1;
+		BOOST_LOG_SEV(main_log, 3) << e.what() ;
+		return 0;
 	}
-    // display data
-    // for debuging
-	std::cout << "data: ";
-	for( auto d : dvect){
-		std::cout << d << " ";
-	}
-	std::cout << std::endl;
 	//
 	if( dvect.size() != (rows*rows) ){
-        std::cout << "rows: " << rows << std::endl;
-        std::cout << "size: " << dvect.size() << std::endl;
-        std::cerr << "Can't invert non-square matrix" << std::endl;
+        BOOST_LOG_SEV(main_log, 3) << "rows: " << rows ;
+        BOOST_LOG_SEV(main_log, 3) << "size: " << dvect.size() ;
+        BOOST_LOG_SEV(main_log, 3) << "Can't invert non-square matrix" ;
         return 0;
 	}
 	M = dvect;
@@ -362,20 +343,22 @@ int InputMatrixParse(char *input, std::vector<double>& M)
     return rows;
 }
 
+
 int main(int argc, char* argv[])
 {
+    log_init();
     std::vector<double> M;
     int row;
     char *input = NULL;
     if(argc > 2) {
-        std::cout << "invalid argument" << std::endl;
+        BOOST_LOG_SEV(main_log, 3) << "invalid argument" ;
         return 0;
     }
     if (argc == 2) input = argv[1];
 
     row = InputMatrixParse(input, M);
     if(row == 0){
-        std::cout << "Invalid data\n";
+        BOOST_LOG_SEV(main_log, 3) << "Invalid data\n";
         return 0;
     }
     int col = M.size()/row;
@@ -397,36 +380,36 @@ int main(int argc, char* argv[])
     }
 
     // Gauss
-    std::cout << "forward elimination" << std::endl;
+    BOOST_LOG_SEV(main_log, 0) << "forward elimination" ;
     bool Fret = forward_elimination<double>(A, I, LU, P);
-    std::cout << std::boolalpha << Fret << std::endl;
+    BOOST_LOG_SEV(main_log, 0) << std::boolalpha << Fret ;
 
     // Jordan Method
-    std::cout << "backward elimination" << std::endl;
+    BOOST_LOG_SEV(main_log, 0) << "backward elimination" ;
     bool Bret = backward_elimination<double>(A, A.size1(), A.size2(), I);
-    std::cout << std::boolalpha << Bret << std::endl;
+    BOOST_LOG_SEV(main_log, 0) << std::boolalpha << Bret ;
 
-    std::cout << karma::format(auto_ % '\t' % karma::eol, make_view(A)) << "\n";
+    BOOST_LOG_SEV(main_log, 0) << karma::format(auto_ % '\t' % karma::eol, make_view(A)) << "\n";
 
     // Inverse matrix exist only if the matrix is square matrix
     // if forward elimination is sucess then the matrix is inversiable
     if(row == col && Fret)
     {
-        std::cout << "Inverse matrix (by gauss Jordan)" << std::endl;
-        std::cout << karma::format(auto_ % '\t' % karma::eol, make_view(I)) << "\n";
+        BOOST_LOG_SEV(main_log, 1) << "Inverse matrix (by gauss Jordan)" ;
+        BOOST_LOG_SEV(main_log, 1) << karma::format(auto_ % '\t' % karma::eol, make_view(I)) << "\n";
 
-        std::cout << "LU matrix" << std::endl;
-        std::cout << karma::format(auto_ % '\t' % karma::eol, make_view(LU)) << "\n";
-        std::cout << "permutation matrix" << std::endl;
-        std::cout << P << std::endl;
+        BOOST_LOG_SEV(main_log, 1) << "LU matrix" ;
+        BOOST_LOG_SEV(main_log, 1) << karma::format(auto_ % '\t' % karma::eol, make_view(LU)) << "\n";
+        BOOST_LOG_SEV(main_log, 1) << "permutation matrix" ;
+        BOOST_LOG_SEV(main_log, 1) << P ;
 
         // Test LU Decomposition by caculating inverse matrix.
         boost::numeric::ublas::matrix<double> inverse(row, row);
         inverse.assign(identity_matrix<double> (row));
         lu_substitute(LU, P, inverse);
 
-        std::cout << "inverse matrix (by LU)" << std::endl;
-        std::cout << karma::format(auto_ % '\t' % karma::eol, make_view(inverse)) << "\n";
+        BOOST_LOG_SEV(main_log, 1) << "inverse matrix (by LU)" ;
+        BOOST_LOG_SEV(main_log, 2) << karma::format(auto_ % '\t' % karma::eol, make_view(inverse)) << "\n";
     }
 
     return 0;
