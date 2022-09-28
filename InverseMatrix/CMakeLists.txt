@@ -25,7 +25,9 @@ FLEX_TARGET(inverse cal.l
     )
 #ADD_FLEX_BISON_DEPENDENCY(lex syntax)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-find_package(Boost 1.74 REQUIRED COMPONENTS log_setup log)
+find_package(Boost REQUIRED COMPONENTS log_setup log)
+
+#for test
 add_executable(cal
     main.cpp
     ${BISON_cal_OUTPUTS}
@@ -36,11 +38,10 @@ add_executable(cal
 
 add_executable(inverse
     gauss_elimination.cpp
-    ${BISON_cal_OUTPUTS}
-    ${FLEX_cal_OUTPUTS}
+    ${BISON_inverse_OUTPUTS}
+    ${FLEX_inverse_OUTPUTS}
     calReader.cpp
     ast.cpp
 )
 
 target_link_libraries(inverse ${Boost_LIBRARIES})
-#TARGET_LINK_LIBRARIES(input_test fl)

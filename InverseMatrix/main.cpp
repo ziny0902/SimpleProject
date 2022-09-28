@@ -1,11 +1,44 @@
+
+
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
 #include <stdexcept>
 #include "calReader.h"
 
+#include "args.hpp"
+
+
+// namespace Args{
+// template <typename Iterator>
+// bool parse_args(Iterator first, Iterator last, std::vector<std::string>& v){ return true;}
+// }
+void args_test( void )
+{
+	// std::string args=" -a -b --backup=ttt \"test\" -a";
+	std::string args=" -a -b  --level \"test\"";
+	Args::args_t v;
+	Args::parse_args<std::string::const_iterator> args_grammer;
+	using boost::spirit::ascii::space;
+	std::string::const_iterator first = args.begin();
+	std::string::const_iterator end = args.end();
+  if ( phrase_parse(first, end, args_grammer, space, v) ){
+		std::cout << "parser sucess" << std::endl;
+		std::cout << v.file << std::endl;
+		std::cout << v.options.size() << std::endl;
+		std::cout << boost::get<std::string>(v.options[2]) << std::endl;
+		// std::cout << boost::fusion::as_vector(v) << std::endl;
+  }
+  else {
+		std::cout << "parser fail" << std::endl;
+  }
+}
+
 int 
 main(const int argc, const char * argv[]) {
+	args_test();
+	return 0;
+
 	if (argc == 2) {
 		cal::calReader reader;
 		reader.parseFromFile(argv[1]);
