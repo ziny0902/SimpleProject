@@ -1,19 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-project(cal CXX)
 project(inverse CXX)
 
 find_package(BISON)
 find_package(FLEX)
-
-BISON_TARGET(cal cal.yy 
-    ${CMAKE_CURRENT_BINARY_DIR}/cal.yy.cpp 
-    COMPILE_FLAGS
-    --header=${CMAKE_CURRENT_BINARY_DIR}/cal.yy.hpp
-    )
-FLEX_TARGET(cal cal.l
-    ${CMAKE_CURRENT_BINARY_DIR}/cal.l.cpp 
-    )
 
 BISON_TARGET(inverse cal.yy 
     ${CMAKE_CURRENT_BINARY_DIR}/cal.yy.cpp 
@@ -27,21 +17,14 @@ FLEX_TARGET(inverse cal.l
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 find_package(Boost REQUIRED COMPONENTS log_setup log)
 
-#for test
-add_executable(cal
-    main.cpp
-    ${BISON_cal_OUTPUTS}
-    ${FLEX_cal_OUTPUTS}
-    calReader.cpp
-    ast.cpp
-)
-
 add_executable(inverse
-    gauss_elimination.cpp
     ${BISON_inverse_OUTPUTS}
     ${FLEX_inverse_OUTPUTS}
     calReader.cpp
     ast.cpp
+    args.cpp
+    log.cpp
+    main.cpp
 )
 
 target_link_libraries(inverse ${Boost_LIBRARIES})

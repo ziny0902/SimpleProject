@@ -83,7 +83,7 @@ void calReader::parseFromStream(std::istream &stream) {
 		std::cout << "Parse failed.\n";
 		std::exit(1);
 	} else {
-		std::cout << "Parse succeed.\n";
+		//std::cout << "Parse succeed.\n";
 	} // end else
 
 } // end method

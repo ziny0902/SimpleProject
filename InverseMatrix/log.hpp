@@ -16,37 +16,26 @@ namespace user {
             using namespace boost::log;
             core::get()->set_filter( severity  >= lev );
         }
+        extern boost::log::sources::severity_logger_mt< >& main_log; 
+        void main_log_init();
     }
 }
 /*
  * use case
  *
 #include "log.hpp"
-BOOST_LOG_GLOBAL_LOGGER_DEFAULT(user::log::main, boost::log::sources::severity_logger_mt< >)
-boost::log::sources::severity_logger_mt< >& main_log = user::log::main::get();
 
-namespace logging = boost::log;
-namespace expr = boost::log::expressions;
-namespace keywords = boost::log::keywords;
-void log_init()
-{
-    logging::add_console_log
-    (
-        std::clog,
-        keywords::format =
-        (
-            expr::stream
-                << "> \n" << expr::smessage
-        )
-    );
-
-    user::log::set_severity_level(1);
-}
 ...
 {
     ...
-    BOOST_LOG_SEV(main_log, 0) << "square matrix - inversiable" ;
+    BOOST_LOG_SEV(usr::log::main_log, 0) << "square matrix - inversiable" ;
     ...
+}
+int main(...)
+{
+    user::log::main_log_init(); 
+    ...
+    BOOST_LOG_SEV(usr::log::main_log, 0) << "..." ;
 }
  */
 
