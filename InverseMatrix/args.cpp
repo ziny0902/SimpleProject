@@ -1,3 +1,4 @@
+#include <stdexcept>
 #include "args_internal.hpp"
 #include "args.hpp"
 
@@ -19,7 +20,7 @@ public:
   }
 };
 
-int initialize_config_with_args(int argc, char* argv[], std::map<std::string, std::string>& config)
+int initialize_config_with_args(int argc, char* argv[], std::map<std::string, std::string>& config, const std::map<std::string, int>& valid_option)
 {
 	int i;
 	std::string str_argv="";
@@ -36,23 +37,33 @@ int initialize_config_with_args(int argc, char* argv[], std::map<std::string, st
 		std::cerr<< "parser fail" << std::endl;
 		return -1;
   }
-	std::for_each(
-		para.options.begin(), para.options.end(), 
-		[&](Args::option_t &opt){ 
-			std::vector<std::string>v = boost::apply_visitor(arg_opt_visitor(), opt);
-			if(v.size() == 1){
-				std::string& opt_str = v[0];
-				std::string str = "";
-				for( i = 0; i < opt_str.size(); i++){
-					str=""; 
-						str.push_back(opt_str[i]);
-						config[str] = "1";
+  try {
+		std::for_each(
+			para.options.begin(), para.options.end(), 
+			[&](Args::option_t &opt){ 
+				std::vector<std::string>v = boost::apply_visitor(arg_opt_visitor(), opt);
+
+    		auto search = valid_option.find(v[0]);
+    		if( search == valid_option.end() ){
+    			throw std::invalid_argument( "Unkown option: " + v[0]);
+    		}
+				if(v.size() == 1){
+					std::string& opt_str = v[0];
+					std::string str = "";
+					for( i = 0; i < opt_str.size(); i++){
+						str=""; 
+							str.push_back(opt_str[i]);
+							config[str] = "1";
+					}
+				}else{
+					config[v[0]] = v[1];
 				}
-			}else{
-				config[v[0]] = v[1];
 			}
-		}
-	);
+		);
+	} catch (std::invalid_argument &e) {
+		std::cerr << e.what() << std::endl;
+		return -1;
+	}
 	if(para.file.size() > 0)
 		config["filename"] = para.file;
 	return 0;

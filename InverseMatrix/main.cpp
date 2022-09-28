@@ -5,6 +5,19 @@
 #include "calReader.h"
 #include "gauss_elimination.hpp"
 
+void print_usage(void)
+{
+  std::cout <<"Usage: inverse [option] [file]" << std::endl;
+  std::cout <<"option:" << std::endl;
+  std::cout <<"\t--help, --level=#NUM(0-3)" << std::endl;
+}
+void print_message_usage_and_exit(std::string msg)
+{
+  std::cout << msg << std::endl;
+  print_usage();
+  exit(0);
+}
+
 void log_init(std::map<std::string, std::string>& config)
 {
   auto search = config.find("level");
@@ -63,33 +76,45 @@ int InputMatrixParse(const char *input, std::vector<double>& M)
   return rows;
 }
 
-
 void main_config(int argc, char *argv[], std::map<std::string, std::string>& config)
 {
-  int ret = initialize_config_with_args(argc, argv, config);
+  //
+  // initialize option map.
+  //
+  const std::map<std::string, int> valid_option
+  {
+    {"help", 1}, {"level", 1}
+  };
+
+  int ret = initialize_config_with_args(argc, argv, config, valid_option);
   if(ret){
-    std::cerr << "Invalid argument" << std::endl;
-    exit(1);
+    print_message_usage_and_exit("Invalid argument");
   }
+  // check help option flag
+  auto search = config.find("help");
+  if( search != config.end() ){
+    print_usage();
+    exit(0);
+  }
+  
   // validate log level.
   {
     auto search = config.find("level");
     if( search != config.end() ){
       std::string lev = config["level"];
       if(lev.size() != 1){
-        std::cerr << "Invalid level" << lev << std::endl;
-        exit(1);
+        print_message_usage_and_exit("Invalid level");
       }
       std::size_t pos {};
       std::stoi(lev, &pos, 4);
       if(pos!=1){
-        std::cerr << "Invalid level" << lev << std::endl;
-        exit(1);
+        print_message_usage_and_exit("Invalid level");
       }
     }
   }
 }
 
+#include <filesystem>
 int main(int argc, char* argv[])
 {
   user::log::main_log_init(); 
@@ -101,6 +126,11 @@ int main(int argc, char* argv[])
     auto search = config.find("filename");
     if( search != config.end())
     {
+      namespace fs = std::filesystem;
+      const fs::path filepath{ config["filename"] };
+      if( !std::filesystem::exists(filepath) ){
+        print_message_usage_and_exit("file does not exist");
+      }
       input = config["filename"].c_str();
     }
   }
