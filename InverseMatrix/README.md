@@ -5,7 +5,8 @@ It apply [partial pivoting](https://www2.math.upenn.edu/~kazdan/320F18/Notes/Gau
 Finally the program display inverse matrix, LU matrix.
 With command line options, you can supress other result and display only inverse matrix.
 It can receive data of input matrix from a file or a stream.
-'''
+
+```
 
 > forward elimination
 >
@@ -166,7 +167,7 @@ It can receive data of input matrix from a file or a stream.
 > -3.0 2.5 -0.5 -3.806e-16
 > -0.5 -1.0 1.0 -0.5
 > 1.5 -0.5 -0.5 0.5
-> '''
+```
 
 ## Prerequisites
 
@@ -176,22 +177,24 @@ It can receive data of input matrix from a file or a stream.
 ## Format of matrix
 
 - basic format
-  ''
+
+  ```
   2, 1, 1, 0
   4, 3, 3, 1
   8, 7, 9, 5
   6, 7, 9, 8
-  ''
+  ```
+
 - you can use basic algebra expression. The program also provide basic math function and constant.
-  '''
+  ```
   t=2*%pi*30/360
   cos(t), sin(t)\*%e
   3+2^7+(3+2), 77
-  '''
+  ```
 
 ## Usage
 
-'''
+```
 Usage: inverse [option] [file]
 
 option:
@@ -207,4 +210,4 @@ ex):
 2^2, -(8+9)^2
 ❯ cat data2 | ./inverse
 ❯ ./inverse --level=2 data2
-'''
+```
