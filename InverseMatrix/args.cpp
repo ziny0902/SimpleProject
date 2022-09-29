@@ -42,20 +42,23 @@ int initialize_config_with_args(int argc, char* argv[], std::map<std::string, st
 			para.options.begin(), para.options.end(), 
 			[&](Args::option_t &opt){ 
 				std::vector<std::string>v = boost::apply_visitor(arg_opt_visitor(), opt);
-
-    		auto search = valid_option.find(v[0]);
-    		if( search == valid_option.end() ){
-    			throw std::invalid_argument( "Unkown option: " + v[0]);
-    		}
 				if(v.size() == 1){
 					std::string& opt_str = v[0];
 					std::string str = "";
 					for( i = 0; i < opt_str.size(); i++){
 						str=""; 
 							str.push_back(opt_str[i]);
+    					auto search = valid_option.find(str);
+    					if( search == valid_option.end() ){
+    						throw std::invalid_argument( "Unkown option: -" + str);
+    					}
 							config[str] = "1";
 					}
 				}else{
+    			auto search = valid_option.find(v[0]);
+    			if( search == valid_option.end() ){
+    				throw std::invalid_argument( "Unkown option: --" + v[0]);
+    			}
 					config[v[0]] = v[1];
 				}
 			}

@@ -8,8 +8,18 @@
 void print_usage(void)
 {
   std::cout <<"Usage: inverse [option] [file]" << std::endl;
+  std::cout << std::endl;
   std::cout <<"option:" << std::endl;
   std::cout <<"\t--help, --level=#NUM(0-3)" << std::endl;
+  std::cout << std::endl;
+  std::cout <<"file format:" << std::endl;
+  std::cout <<"\texp ,exp .. ,exp" << std::endl;
+  std::cout <<"\t..." << std::endl;
+  std::cout <<"\texp ,exp .. ,exp" << std::endl;
+  std::cout << std::endl;
+  std::cout <<"ex):" << std::endl;
+  std::cout <<"\t2*3, 7*sqrt(9)" << std::endl;
+  std::cout <<"\t2^2, -(8+9)^2" << std::endl;
 }
 void print_message_usage_and_exit(std::string msg)
 {
@@ -30,7 +40,6 @@ void log_init(std::map<std::string, std::string>& config)
 int InputMatrixParse(const char *input, std::vector<double>& M)
 {
   std::string str;
-  int rows = 0;
 	cal::calReader reader;
   std::istream *in = &std::cin;
   std::ifstream fin ;
@@ -54,10 +63,9 @@ int InputMatrixParse(const char *input, std::vector<double>& M)
       }
     }
 	  reader.parseFromString(str);
-    rows += 1;
   }
 
-    std::vector<double> dvect;
+  std::vector<double> dvect;
 	try{
 		 dvect = reader.eval();
 	}  catch (std::invalid_argument &e) {
@@ -65,8 +73,10 @@ int InputMatrixParse(const char *input, std::vector<double>& M)
 		return 0;
 	}
 	//
+  int rows = 0;
+	rows = (int)sqrt(dvect.size());
 	if( dvect.size() != (rows*rows) ){
-    BOOST_LOG_SEV(main_log, 3) << "rows: " << rows ;
+    BOOST_LOG_SEV(main_log, 3) << "rows: " << rows;
     BOOST_LOG_SEV(main_log, 3) << "size: " << dvect.size() ;
     BOOST_LOG_SEV(main_log, 3) << "Can't invert non-square matrix" ;
     return 0;
@@ -162,6 +172,10 @@ int main(int argc, char* argv[])
   BOOST_LOG_SEV(main_log, 0) << "forward elimination" ;
   bool Fret = forward_elimination<double>(A, I, LU, P);
   BOOST_LOG_SEV(main_log, 0) << std::boolalpha << Fret ;
+  if(!Fret){
+    BOOST_LOG_SEV(main_log, 3) << "Matrix is not inversiable." << std::endl;
+    return 1;
+  }
 
   // Jordan Method
   BOOST_LOG_SEV(main_log, 0) << "backward elimination" ;

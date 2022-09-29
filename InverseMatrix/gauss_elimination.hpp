@@ -127,7 +127,6 @@ bool forward_elimination(boost::numeric::ublas::matrix<T>& A,
         using namespace karma;
         BOOST_LOG_SEV(main_log, 0) << karma::format(auto_ % '\t' % karma::eol, make_view(A)) << "\n";
         if(row != col) continue;
-        BOOST_LOG_SEV(main_log, 0) << LU ;
         BOOST_LOG_SEV(main_log, 0) << "LU : " ;
         BOOST_LOG_SEV(main_log, 0) << karma::format(auto_ % '\t' % karma::eol, make_view(LU)) << "\n";
     }
