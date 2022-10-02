@@ -15,7 +15,7 @@ std::array<double, 3> cross(std::array<double, 3> a, std::array<double, 3>b)
 {
   std::array<double, 3> ret;
   ret[0] = a[1]*b[2] - a[2]*b[1];
-  ret[1] = -1*a[0]*b[2] + a[2]*b[0];
+  ret[1] = a[2]*b[0] - a[0]*b[2];
   ret[2] = a[0]*b[1] - a[1]*b[0];
   return ret;
 }
