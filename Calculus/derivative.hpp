@@ -8,10 +8,10 @@
 namespace support{namespace math{
   template <class F, size_t d>
   class partial_derivative{
-    F& fn;
+    protected:
+      F fn;
     public:
-      partial_derivative(F &f ) : fn(f){
-      };
+      partial_derivative(F& f ) : fn(f){};
       double diff(std::array<double, d>& in, size_t t){
         auto f = [&](double x){
           double orig = in[t];
@@ -59,6 +59,26 @@ namespace support{namespace math{
           dret += u[i] * g[i];
         }
         return dret;
+      }
+  };
+
+  // d: dimension, N: num of variable
+  template <typename F, size_t d, size_t N>
+  struct parametric_fn{
+    std::array<F, d> fn_arr{}; 
+    int var{0};
+    parametric_fn(std::array<F, d> f_arr) : fn_arr(f_arr){};
+    virtual double operator()(std::array<double, N>&t){
+      return fn_arr[var](t);
+    };
+  };
+
+  template <class F, size_t d>
+  class parametric_derivative : public partial_derivative< F,  d>{
+    public:
+      parametric_derivative(F & _fn) : partial_derivative<F, d>(_fn){};
+      void select_variable(int var){
+        this->fn.var = var;
       }
   };
 

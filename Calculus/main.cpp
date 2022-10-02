@@ -50,9 +50,6 @@ void boost_partial_derivative(void)
   std::array<double, 3> in = {1, 2, 3};
   support::math::partial_derivative<decltype(fn), 3>df(fn);
   std::array<double, 3> ret = df.gradiant(in);
-  // std::cout << ret[0] << " " << ret[1] << " " << ret[2] << std::endl;
-  // std::cout << df.diff(in, 1) << std::endl;
-  // std::cout << df.second_order_diff(in, 1) << std::endl;
 
   // 2 variable scalar function.
   struct {
@@ -63,9 +60,7 @@ void boost_partial_derivative(void)
   std::array<double, 2> in_2 = {3, 2};
   support::math::partial_derivative<decltype(fn_d), 2>df_2(fn_d);
   std::array<double, 2> ret_2 = df_2.gradiant(in_2);
-  // std::cout << ret_2[0] << " " << ret_2[1] << std::endl;
   std::array<double, 2> v {2, 1};
-  // std::cout << df_2.directional_derivative(in_2, v) << std::endl;
 
   // 3 variable scalar function
   struct {
@@ -78,57 +73,53 @@ void boost_partial_derivative(void)
   ret = df_3.gradiant(in);
   std::cout << "x^2*pow(M_E, x^2 + z^2 - 5) (x=1, y=3, z=2) gradiant:" << std::endl;
   std::cout << ret << std::endl;
-  std::array<double, 3> v_3 {3, -1, 4};
+  std::array<double, 3> dir{3, -1, 4};
   std::cout << "x^2*pow(M_E, x^2 + z^2 - 5) (x=1, y=3, z=2) direction vector[3, -1, 4] directional derivative:" << std::endl;
-  std::cout << df_3.directional_derivative(in, v_3) << std::endl;
+  std::cout << df_3.directional_derivative(in, dir) << std::endl;
 
+  {
   // parametric function.
-  struct {
-    std::array<double(*)(double), 3> fn_arr {
-      [](double t){return cos(t);},
-      [](double t){return sin(t);},
-      [](double t){return t;}
-    };
-    int var {1};
-    double operator()(std::array<double, 1>&t){  
-      return fn_arr[var](t[0]); 
-    }
-    double operator()(std::array<double, 1>&t, int var){  
-      return fn_arr[var](t[0]); 
-    }
-  } para_fn;
-  support::math::partial_derivative<decltype(para_fn), 1>df_para(para_fn);
+  // d: 3 dimension, N: 1 variable
+  support::math::parametric_fn<double(*)(std::array<double, 1>&), 3, 1>
+    para_fn({
+        [](std::array<double,1>& t){return cos(t[0]);}, // x 
+        [](std::array<double,1>& t){return sin(t[0]);}, // y
+        [](std::array<double,1>& t){return t[0];} // z
+        });
+  support::math::parametric_derivative<decltype(para_fn), 1>df_para(para_fn);
   std::array<double, 1>para_in{M_PI/2};
   std::cout<< "parametric function x(t)=cos(t), y(t)=sin(t), t=t (t=pi/2) derivative:" << std::endl;
+  std::array<double, 3> tangent;
+  std::array<double, 3> normal;
   for(int i = 0; i < 3; i++){
-    para_fn.var=i;
-    std::cout << df_para.diff(para_in, 0) << ", ";
+    df_para.select_variable(i);
+    tangent[i] =  df_para.diff(para_in, 0);
+    normal[i] = df_para.second_order_diff(para_in, 0);
   }
-  std::cout << std::endl;
-  para_fn.var=1;
-  std::cout << "y'': "<<df_para.second_order_diff(para_in, 0) << std::endl;
+  tangent = unit_vector(tangent);
+  normal = unit_vector(normal);
+  std::array<double, 3> binormal = cross(tangent, normal);
+  std::cout << "tangent: " << tangent << std::endl;
+  std::cout << "normal: " << normal << std::endl;
+  std::cout << "binormal: " << binormal << std::endl;
+  }
 
-  // unit normal, tangent, binormal
-  struct {
-    std::array<double(*)(std::array<double, 2>&), 3> fn_arr {
-      [](std::array<double, 2>&t){return t[0]+1;},
-      [](std::array<double, 2>&t){return t[1];},
-      [](std::array<double, 2>&t){return t[1]*t[1] - t[0]*t[0] +1;}
-    };
-    int var {0};
-    double operator()(std::array<double, 2>&t){  
-      return fn_arr[var](t); 
-    }
-    double operator()(std::array<double, 2>&t, int var){  
-      return fn_arr[var](t); 
-    }
-  } surface_fn;
-  support::math::partial_derivative<decltype(surface_fn), 2>df_surface(surface_fn);
+  {
+  // d: 3 dimension, N: 2 variable
+  support::math::parametric_fn<double(*)(std::array<double, 2>&), 3, 2>
+    surface_fn({
+        [](std::array<double, 2>&t){return t[0]+1;}, // x
+        [](std::array<double, 2>&t){return t[1];}, // y
+        [](std::array<double, 2>&t){return t[1]*t[1] - t[0]*t[0] +1;} // z
+        });
+  support::math::parametric_derivative<decltype(surface_fn), 2>df_surface(surface_fn);
+
    v = {1, -2};
   std::array<double, 3>ru{};
   std::array<double, 3>rv{};
   for(int i = 0; i < 3; i++){
-    surface_fn.var=i;
+    // surface_fn.var=i;
+    df_surface.select_variable(i);
     ru[i] = df_surface.diff(v, 0);
     rv[i] = df_surface.diff(v, 1);
   }
@@ -138,13 +129,14 @@ void boost_partial_derivative(void)
   std::array<double, 3>normal = cross(ru, rv);
   std::cout << "normal(dt X ds): " << normal << std::endl;
   std::cout << "unit normal: " << unit_vector(normal) << std::endl;
+  }
 }
 
 // #include <boost/math/quadrature/gauss_kronrod.hpp>
 #include "integral.hpp"
 void boost_integrate(void)
 {
-  std::cout << "<<Integral test>>" << std::endl;
+  std::cout << "<<test Integral>>" << std::endl;
   using namespace boost::math::quadrature;
   auto f1 = [](double t) { return std::exp(-t*t / 2); };
   double error;
@@ -156,9 +148,8 @@ void boost_integrate(void)
   for (double x=0; x <= 4.1; x=x+0.1)
   {
     Q = gauss_kronrod<double, 15>::integrate(f1, 0, x, 5, 1e-9, &error);
-    // std::cout << x << " " << Q << std::endl;
   }
-  // double integral
+  // double integral without wrapper
   {
     std::array<double, 2> x{0, 2};
     std::array<double, 2> y{-M_PI, M_PI};
@@ -207,7 +198,8 @@ void boost_integrate(void)
     auto f = [](double x, double y, double z){ return x + z*z*y; };
     support::math::triple_integral_t df (f, {-1, 5}, {2, 4}, {0, 1});
     std::cout << "integral( x + yz^2) | x[-1 5] y[0 1] z[2 4]: " << df.eval() << std::endl;
-  }{
+  }
+  {
     // f(x,y,z) = x^2yz 
     auto f = [](double x, double y, double z){ return x*x*y*z; };
     support::math::triple_integral_t df (f, {-2, 1}, {0, 3}, {1, 5});
