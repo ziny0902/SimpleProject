@@ -140,8 +140,84 @@ void boost_partial_derivative(void)
   std::cout << "unit normal: " << unit_vector(normal) << std::endl;
 }
 
+// #include <boost/math/quadrature/gauss_kronrod.hpp>
+#include "integral.hpp"
+void boost_integrate(void)
+{
+  std::cout << "<<Integral test>>" << std::endl;
+  using namespace boost::math::quadrature;
+  auto f1 = [](double t) { return std::exp(-t*t / 2); };
+  double error;
+  double Q;
+
+  // basic integral
+  Q = gauss_kronrod<double, 15>::integrate(f1, 0, std::numeric_limits<double>::infinity(), 0, 0, &error);
+  std::cout << "0 - INF: " << Q << std::endl;
+  for (double x=0; x <= 4.1; x=x+0.1)
+  {
+    Q = gauss_kronrod<double, 15>::integrate(f1, 0, x, 5, 1e-9, &error);
+    // std::cout << x << " " << Q << std::endl;
+  }
+  // double integral
+  {
+    std::array<double, 2> x{0, 2};
+    std::array<double, 2> y{-M_PI, M_PI};
+    double total;
+    total = 
+    gauss_kronrod<double, 15>::integrate(
+        [&] (double _y){ 
+            return gauss_kronrod<double, 15>::integrate
+            (
+              [&] (double _x) { return _x + std::sin(_y)+1 ; },
+              x[0], x[1], 5, 1e-9, &error
+            ); 
+          }, 
+          y[0], y[1], 5, 1e-9, &error);
+    std::cout << "integral(x + sin(y) + 1) | x[0 2], y[-pi pi]: " << total << std::endl;
+  }
+  //
+  // using wrapper class
+  //
+  // basic single Integral
+  std::cout << "--wrapper test" << std::endl;
+  {
+    // e^(-t^2/2)
+    auto f = [](double t) { return std::exp(-t*t / 2); };
+    support::math::single_integral_t df
+      { f, {0, std::numeric_limits<double>::infinity()} };
+    std::cout << "Integral( -x^2 / 2 ) | x[0  INF]: " << df.eval() << std::endl;
+  }
+  // double integral
+  {
+    // x + sin(y) + 1
+    auto f = [](double x, double y){ return x + std::sin(y) + 1; };
+    // ( function, x range, y range )
+    support::math::double_integral_t df{f, {0,2}, {-M_PI, M_PI}};
+    std::cout << "integral(x + sin(y) + 1) | x[0 2], y[-pi pi]: " << df.eval() << std::endl;
+  }
+  // triple integral
+  {
+    // f(x,y,z) = 8xyz
+    auto f = [](double x, double y, double z){ return 8*x*y*z; };
+    support::math::triple_integral_t df (f, {0, 1}, {2, 3}, {1, 2});
+    std::cout << "integral( 8xyz ) | z[0 1] x[2 3] y[1 2]: " << df.eval() << std::endl;
+  }
+  {
+    // f(x,y,z) = x+ yz^2 
+    auto f = [](double x, double y, double z){ return x + z*z*y; };
+    support::math::triple_integral_t df (f, {-1, 5}, {2, 4}, {0, 1});
+    std::cout << "integral( x + yz^2) | x[-1 5] y[0 1] z[2 4]: " << df.eval() << std::endl;
+  }{
+    // f(x,y,z) = x^2yz 
+    auto f = [](double x, double y, double z){ return x*x*y*z; };
+    support::math::triple_integral_t df (f, {-2, 1}, {0, 3}, {1, 5});
+    std::cout << "integral( x^2yz ) | x[0 3] y[-2 1] z[1 5]: " << df.eval() << std::endl;
+  }
+}
+
 int main()
 {
   boost_partial_derivative();
+  boost_integrate();
   return 0;
 }
