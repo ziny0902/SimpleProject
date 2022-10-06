@@ -2,3 +2,5 @@ boost/
 */build/
 */.cache/
 InverseMatrix/flex-bison-cpp/
+Graph2D/MaterialDesign
+Graph2D/__pycache__

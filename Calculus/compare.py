@@ -8,7 +8,6 @@ def draw2DgraphFromFile(g, file, type):
     df = pd.read_csv(file, index_col=0, sep=" ")
     g.plot_data(df, ' using 1:2 with lines lc "web-blue" ', terminal=type)
 
-
 def draw2Dgraph(xa, ya, type, file) -> gnuplot.Gnuplot:
     g = gnuplot.Gnuplot(
         output=file,
