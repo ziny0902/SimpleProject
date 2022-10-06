@@ -6,7 +6,6 @@ from kivy.graphics import *
 from kivy.uix.popup import Popup
 from kivy.properties import ObjectProperty
 from kivy.uix.floatlayout import FloatLayout
-from  kivy.uix.textinput import TextInput
 
 
 kv_test = """
@@ -21,6 +20,8 @@ kv_test = """
         id:grah
 
 <LoadDialog>:
+    size_hint_y: None 
+    height: "250dp"
     BoxLayout:
         size: root.size
         pos: root.pos
@@ -43,6 +44,8 @@ kv_test = """
                 on_release: root.load(filechooser.path, filechooser.selection)
 
 <MathEditDialog>:
+    size_hint_y: None
+    height: "220dp"
     MDBoxLayout:
         size: root.size
         pos: root.pos
@@ -78,12 +81,13 @@ kv_test = """
             spacing: "20dp"
             adaptive_size: True
             pos_hint: {"center_x": .5, "center_y": .5}
-            MDRoundFlatButton:
+            # MDRoundFlatButton:
+            MDFlatButton:
                 text: "Cancel"
                 on_release: root.cancel()
 
-            MDRoundFlatButton:
-                text: "Load"
+            MDFlatButton:
+                text: "Ok"
                 on_release: root.eval(math_expr.text, start.text, end.text, step.text)
 """
 
@@ -196,6 +200,28 @@ class Graph2d(Round2Dtemplate):
         from sympy import sympify
         import numpy as np
         from sympy.abc import x
+        from kivymd.uix.snackbar import Snackbar
+        from kivymd.uix.button import MDFlatButton
+        print(len(expr), len(s), len(e))
+        if len(expr) == 0 or len(s) == 0 or len(e) == 0 or len(step) == 0 :
+            snackbar = Snackbar(
+                text="you have to fill fields!",
+                snackbar_x="10dp",
+                snackbar_y="10dp",
+            )
+            snackbar.size_hint_x = (
+                Window.width - (snackbar.snackbar_x * 2)
+            ) / Window.width
+            snackbar.buttons = [
+                MDFlatButton(
+                    text="OK",
+                    text_color=(1, 1, 1, 1),
+                    on_release=snackbar.dismiss,
+                )
+            ]
+            snackbar.open()
+            return
+
         f = sympify(expr)
         start:float = float(s)
         end:float = float(e)
@@ -205,17 +231,16 @@ class Graph2d(Round2Dtemplate):
             y.append(f.subs(x, t))
         self.add_plot(list(input), y)
         self.dismiss_popup()
-
     def on_file_select(self):
+        from kivymd.uix.dialog import MDDialog
         content = LoadDialog(load=self.file_load, cancel=self.dismiss_popup)
-        self._popup = Popup(title="Load csv file", content=content,
-                            size_hint=(0.7, 0.7))
+        self._popup = MDDialog(title="Choose csv file", type="custom", content_cls=content)
         self._popup.open()
 
     def on_mathexpr_select(self):
+        from kivymd.uix.dialog import MDDialog
         content = MathEditDialog(eval=self.eval, cancel=self.dismiss_popup)
-        self._popup = Popup(title="Edit Math Expression", content=content,
-                            size_hint=(0.7, 0.7))
+        self._popup = MDDialog(title="Edit Math Expression", type="custom", content_cls=content)
         self._popup.open()
 
     def get_disp_format_string(self, x, y, num:int) -> str:
