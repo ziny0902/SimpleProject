@@ -1,9 +1,7 @@
-from kivy.uix.boxlayout import BoxLayout
 from Round2Dtemplate import Round2Dtemplate
 from kivy.core.window import Window
 import pandas as pd
 from kivy.graphics import *
-from kivy.uix.popup import Popup
 from kivy.properties import ObjectProperty
 from kivy.uix.floatlayout import FloatLayout
 
@@ -81,7 +79,6 @@ kv_test = """
             spacing: "20dp"
             adaptive_size: True
             pos_hint: {"center_x": .5, "center_y": .5}
-            # MDRoundFlatButton:
             MDFlatButton:
                 text: "Cancel"
                 on_release: root.cancel()
