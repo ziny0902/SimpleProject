@@ -12,19 +12,11 @@ from  kivy.uix.textinput import TextInput
 kv_test = """
 <Gl2dGraph>:
     orientation: 'vertical'
-    ActionBar:
-        pos_hint: {'top': 1}
-        ActionView:
-            ActionPrevious:
-                title: ''
-                app_icon: ''
-                with_previous: False
-            ActionButton:
-                icon: r'icon/file-document-plus.png'
-                on_release: grah.on_file_select()
-            ActionButton:
-                icon: r'icon/calculator-variant-outline.png'
-                on_release: grah.on_mathexpr_select()
+    MDTopAppBar:
+        title: "Graph2D"
+        right_action_items: 
+            [["file-document-plus", lambda x: root.ids.grah.on_file_select()],
+            ["calculator-variant-outline", lambda x: root.ids.grah.on_mathexpr_select()] ]
     Graph2d:
         id:grah
 
@@ -38,63 +30,60 @@ kv_test = """
             path: u'./'
             filters: ['*.csv']
 
-        BoxLayout:
-            size_hint_y: None
-            height: 30
-            Button:
+        MDBoxLayout:
+            spacing: "20dp"
+            adaptive_size: True
+            pos_hint: {"center_x": .5, "center_y": .5}
+            MDRoundFlatButton:
                 text: "Cancel"
                 on_release: root.cancel()
 
-            Button:
+            MDRoundFlatButton:
                 text: "Load"
                 on_release: root.load(filechooser.path, filechooser.selection)
 
 <MathEditDialog>:
-    BoxLayout:
+    MDBoxLayout:
         size: root.size
         pos: root.pos
         orientation: "vertical"
-        TextInput:
+        spacing: "10dp"
+        MDTextField:
             id: math_expr 
+            hint_text: "expression"
             on_text: root.on_text(self, self.text)
             on_focus: root.on_focus(self, 0)
-        BoxLayout:
-            size_hint_y: None
-            height: 30
-            Label:
-                size_hint_x: None
-                width: 50
-                text: 'start'
+        MDBoxLayout:
+            spacing: "5dp"
             FloatInput:
                 id: start
+                hint_text: "start"
+                mode: "rectangle"
                 on_focus: root.on_focus(self, 1)
                 on_text: root.on_text(self, self.text)
-            Label:
-                size_hint_x: None
-                width: 50
-                text: 'end'
             FloatInput:
                 id: end
+                hint_text: "end"
+                mode: "rectangle"
                 on_focus: root.on_focus(self, 2)
                 on_text: root.on_text(self, self.text)
-            Label:
-                size_hint_x: None
-                width: 110
-                text: 'number of step'
             FloatInput:
                 id: step
+                hint_text: "num of step"
+                mode: "rectangle"
                 on_focus: root.on_focus(self, 3)
                 on_text: root.on_text(self, self.text)
 
-        BoxLayout:
-            size_hint_y: None
-            height: 30
-            Button:
+        MDBoxLayout:
+            spacing: "20dp"
+            adaptive_size: True
+            pos_hint: {"center_x": .5, "center_y": .5}
+            MDRoundFlatButton:
                 text: "Cancel"
                 on_release: root.cancel()
 
-            Button:
-                text: "Evaluate"
+            MDRoundFlatButton:
+                text: "Load"
                 on_release: root.eval(math_expr.text, start.text, end.text, step.text)
 """
 
@@ -140,21 +129,19 @@ class MathEditDialog(FloatLayout):
         self.focus_group=[self.ids.math_expr, self.ids.start, self.ids.end, self.ids.step]
     def on_focus(self, instance, value):
         self.next_focus = (value+1)%4
-        print("on_focus")
         pass
     def on_text(self, instance, value:str) :
         c = ' '
-        print("on_text")
         if len(value) > 0:
             c = value[len(value) -1]
         if c == '\t':
-            print("receive tab: ", self.next_focus)
             # instance.focus = False
             self.focus_group[self.next_focus].focus = True
             instance.text = value.split("\t")[0]
 
 import re
-class FloatInput(TextInput):
+from kivymd.uix.textfield.textfield import MDTextField
+class FloatInput(MDTextField):
     pat:str = re.compile('[^0-9]')
 
     def insert_text(self, substring, from_undo=False):
@@ -222,15 +209,14 @@ class Graph2d(Round2Dtemplate):
     def on_file_select(self):
         content = LoadDialog(load=self.file_load, cancel=self.dismiss_popup)
         self._popup = Popup(title="Load csv file", content=content,
-                            size_hint=(0.5, 0.7))
+                            size_hint=(0.7, 0.7))
         self._popup.open()
 
     def on_mathexpr_select(self):
         content = MathEditDialog(eval=self.eval, cancel=self.dismiss_popup)
         self._popup = Popup(title="Edit Math Expression", content=content,
-                            size_hint=(0.5, 0.5))
+                            size_hint=(0.7, 0.7))
         self._popup.open()
-        print("on_maxexpr_select")
 
     def get_disp_format_string(self, x, y, num:int) -> str:
         fmt_str = ""
@@ -385,7 +371,7 @@ class Graph2d(Round2Dtemplate):
             pt.append(viewport[2])
             pt.append(y)
             self.kivy_instructions.add(Line(points=pt, width=1))
-            self.textdraw.puts(self.ytick_str[i-1], 0, y+self.textdraw.glyph_h/2, [255, 255, 255])
+            self.textdraw.puts(self.ytick_str[i-1], viewport[0] - self.pad[0], y+self.textdraw.glyph_h/2, [255, 255, 255])
             pt.clear()
         self.kivy_instructions.add(Color(1, 1, 1, 0.5)) # axis color
         for i in range(0, num+1):
@@ -475,10 +461,13 @@ from kivy.lang import Builder
 if __name__ == "__main__":
     Builder.load_string(kv_test)
     
-    class Gl2dGraph(BoxLayout):
+    from kivymd.uix.boxlayout import MDBoxLayout
+    class Gl2dGraph(MDBoxLayout):
         pass
-    from kivy.app import App
-    class graph2dApp(App):
+    # from kivy.app import App
+    from kivymd.app import MDApp
+    class graph2dApp(MDApp):
         def build(self):
+            self.theme_cls.theme_style = "Dark"
             return Gl2dGraph()
     graph2dApp().run()

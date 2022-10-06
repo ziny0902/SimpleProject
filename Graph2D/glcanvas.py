@@ -11,7 +11,8 @@ from kivy.graphics.fbo import Fbo
 # Builder.load_file('File.kv')
 
 #class Glcanvas(RelativeLayout):
-class Glcanvas(FloatLayout):
+from kivymd.uix.relativelayout import MDRelativeLayout 
+class Glcanvas(MDRelativeLayout):
     Resolution = (0.0, 0.0, 0.0, 0.0)
     Screen = (0.0,0.0)
     def __init__(self, **kwargs):
@@ -30,7 +31,6 @@ class Glcanvas(FloatLayout):
         self.fbo.size = self.size
         self.viewport.texture = self.fbo.texture
         self.viewport.size = self.size
-        self.viewport.pos = self.pos
 
     def update(self, instr):
         pass

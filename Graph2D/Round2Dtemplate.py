@@ -74,8 +74,8 @@ class Round2Dtemplate(Glcanvas):
         instructions = InstructionGroup()
         instructions.add(self.round2d.renderer)
         instructions.add(self.textdraw.renderer)
+        instructions.add(self.kivy_instructions)
         self.fbo.add(instructions)
-        self.fbo.add(self.kivy_instructions)
         self.fbo.release()
 
 class TemplateTest(Round2Dtemplate):
