@@ -20,7 +20,7 @@ class Glcanvas(MDRelativeLayout):
         super(Glcanvas, self).__init__(**kwargs)
         with self.canvas:
             self.cb = Callback(self.update, reset_context=False)
-            self.fbo = Fbo (size=self.size, clear_color=(0., 0., 0., 0.))
+            self.fbo = Fbo (with_depthbuffer = True, size=self.size, clear_color=(0., 0., 0., 0.))
             self.viewport = Rectangle(size=self.size, pos=self.pos)
         self.bind(pos=self.resize)
         self.bind(size=self.resize)

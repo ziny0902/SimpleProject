@@ -2,6 +2,7 @@ from kivy.uix.gridlayout import GridLayout
 from glcanvas import Glcanvas
 from BasicTextDraw import BasicTextDraw
 from Round2DRender import Round2DRender
+from Renderer3D import Renderer3D
 from kivy.graphics import InstructionGroup, Rectangle
 from kivy.graphics import *
 from kivy.graphics.instructions import InstructionGroup
@@ -53,12 +54,14 @@ class Round2Dtemplate(Glcanvas):
     text_bottom_right = StringProperty('')
     def __init__(self, **kwargs):
         super(Round2Dtemplate, self).__init__(**kwargs)
-        self.round2d = Round2DRender();
+        self.round2d = Round2DRender()
         self.textdraw=BasicTextDraw()
+        self.renderer3d = Renderer3D()
         self.kivy_instructions = InstructionGroup()
 
     def resize(self, *args):
         super().resize(*args)
+        self.renderer3d.setup_projection(self.width, self.height)
 
     def frame(self, delta):
         super().frame(delta)
@@ -71,10 +74,12 @@ class Round2Dtemplate(Glcanvas):
         self.fbo.clear_buffer()
         self.textdraw.flush()
         self.round2d.flush()
+        self.renderer3d.flush()
         instructions = InstructionGroup()
-        instructions.add(self.round2d.renderer)
         instructions.add(self.textdraw.renderer)
+        instructions.add(self.round2d.renderer)
         instructions.add(self.kivy_instructions)
+        instructions.add(self.renderer3d.renderer)
         self.fbo.add(instructions)
         self.fbo.release()
 
@@ -85,6 +90,7 @@ class TemplateTest(Round2Dtemplate):
         Window.bind(mouse_pos=self.mouse_pos)
     def frame(self, delta):
         delta = delta
+        # self.renderer3d.rotate(delta,self.width, self.height)
         pass
     def mouse_pos(self, window, pos):
         x, y = pos
@@ -99,6 +105,17 @@ class TemplateTest(Round2Dtemplate):
         #print("[DEBUG] display")
         # pos, angle, r, out, fill
         # test data.
+        #3d rendering test
+        triangle = [  [ 0.0, -0.25, -0.50],
+                [ 0.0,  0.25,  0.00],
+                [ 0.5, -0.25,  0.25],
+                [-0.5, -0.25,  0.25] ];
+        self.renderer3d.drawTriangle(triangle[2], triangle[1], triangle[3], [0, 255, 0, 255], [255, 255, 255, 255])
+        self.renderer3d.drawTriangle(triangle[3], triangle[1], triangle[0], [35, 55, 155, 255], [255, 255, 255, 255])
+        self.renderer3d.drawTriangle(triangle[0], triangle[1], triangle[2], [155, 0, 0, 255], [255, 255, 155, 255])
+        self.renderer3d.drawTriangle(triangle[0], triangle[2], triangle[3], [155, 155, 155, 255], [255, 255, 255, 255])
+
+
         self.round2d.drawCircle([300, 300], 0, 50, [255, 255, 255, 255], [179, 127, 255, 255])
         self.round2d.drawPolygon(
                 4,
