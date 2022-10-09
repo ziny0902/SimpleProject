@@ -61,17 +61,19 @@ class Round2Dtemplate(Glcanvas):
 
     def resize(self, *args):
         super().resize(*args)
-        self.renderer3d.setup_projection(self.width, self.height)
+        self.renderer3d.setup_projection(self.width, self.height, 0.1, 100)
 
     def frame(self, delta):
         super().frame(delta)
         pass
 
+    def update(self, instr ):
+        super().update(instr)
+
+
     def drawFlushRenderer(self):
         #test
-        self.fbo.bind()
         self.fbo.clear()
-        self.fbo.clear_buffer()
         self.textdraw.flush()
         self.round2d.flush()
         self.renderer3d.flush()
@@ -81,27 +83,35 @@ class Round2Dtemplate(Glcanvas):
         instructions.add(self.kivy_instructions)
         instructions.add(self.renderer3d.renderer)
         self.fbo.add(instructions)
-        self.fbo.release()
 
 class TemplateTest(Round2Dtemplate):
     def __init__(self, **kwargs):
         self.mouse_circle= Line(circle=(0, 0, 0), width = 1);
         super(TemplateTest, self).__init__(**kwargs)
-        Window.bind(mouse_pos=self.mouse_pos)
+        Window.bind(mouse_pos=self.on_mouse_move)
+        self.setup_scene()
+        self.angle=0
+        self.mouse_pos = (0, 0)
+
     def frame(self, delta):
         delta = delta
         # self.renderer3d.rotate(delta,self.width, self.height)
-        pass
-    def mouse_pos(self, window, pos):
-        x, y = pos
+        super().frame(delta)
+        self.angle += 1
+        self.renderer3d.rotate(self.angle, [1, 1, 1])
+        x, y = self.mouse_pos
         if x > self.pos[0] and x < self.pos[0]+ self.size[0]\
             and y > self.pos[1] and y < self.pos[1] + self.size[1]:
-            self.mouse_circle.circle=(x - self.pos[0], y - self.pos[1], 10);
             self.text_top_left = str((x - self.pos[0], y - self.pos[1]))
+            self.mouse_circle.circle=(x - self.pos[0], y - self.pos[1], 10)
         else:
-            self.mouse_circle= Line(circle=(0, 0, 0), width = 1);
-    def update(self, instr ):
-        super().update(instr)
+            self.mouse_circle.circle=(0, 0, 1);
+        pass
+
+    def on_mouse_move(self, window, pos):
+        self.mouse_pos = pos
+
+    def setup_scene(self):
         #print("[DEBUG] display")
         # pos, angle, r, out, fill
         # test data.
@@ -113,7 +123,11 @@ class TemplateTest(Round2Dtemplate):
         self.renderer3d.drawTriangle(triangle[2], triangle[1], triangle[3], [0, 255, 0, 255], [255, 255, 255, 255])
         self.renderer3d.drawTriangle(triangle[3], triangle[1], triangle[0], [35, 55, 155, 255], [255, 255, 255, 255])
         self.renderer3d.drawTriangle(triangle[0], triangle[1], triangle[2], [155, 0, 0, 255], [255, 255, 155, 255])
-        self.renderer3d.drawTriangle(triangle[0], triangle[2], triangle[3], [155, 155, 155, 255], [255, 255, 255, 255])
+        self.renderer3d.drawTriangle(triangle[3], triangle[0], triangle[2], [155, 155, 155, 255], [255, 255, 255, 255])
+        # self.renderer3d.drawTriangle(triangle[2], triangle[1], triangle[3], [0, 255, 0, 255], [0, 0, 0, 255])
+        # self.renderer3d.drawTriangle(triangle[3], triangle[1], triangle[0], [35, 55, 155, 255], [0, 0, 0, 255])
+        # self.renderer3d.drawTriangle(triangle[0], triangle[1], triangle[2], [155, 0, 0, 255], [0, 0, 0, 255])
+        # self.renderer3d.drawTriangle(triangle[3], triangle[0], triangle[2], [155, 155, 155, 255], [0, 0, 0, 255])
 
 
         self.round2d.drawCircle([300, 300], 0, 50, [255, 255, 255, 255], [179, 127, 255, 255])
@@ -139,6 +153,9 @@ class TemplateTest(Round2Dtemplate):
         self.kivy_instructions.add(Color(1,1,1))
         self.kivy_instructions.add(self.mouse_circle)
         self.drawFlushRenderer()
+
+    def update(self, instr ):
+        super().update(instr)
     pass
 if __name__ == "__main__":
     Builder.load_file('File.kv')

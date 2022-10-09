@@ -185,6 +185,8 @@ class Graph2d(Round2Dtemplate):
     def __init__(self, **kwargs):
         super(Graph2d, self).__init__(**kwargs)
         Window.bind(mouse_pos=self.mouse_pos)
+        self.tracker_line = None
+        self.tracker_points:list = None
 
     def dismiss_popup(self):
         self._popup.dismiss()
@@ -199,7 +201,6 @@ class Graph2d(Round2Dtemplate):
         from sympy.abc import x
         from kivymd.uix.snackbar import Snackbar
         from kivymd.uix.button import MDFlatButton
-        print(len(expr), len(s), len(e))
         if len(expr) == 0 or len(s) == 0 or len(e) == 0 or len(step) == 0 :
             snackbar = Snackbar(
                 text="you have to fill fields!",
@@ -270,8 +271,12 @@ class Graph2d(Round2Dtemplate):
         x_range = self.x_range
         x = x_range[0] + (x_range[1] - x_range[0]) \
                 * (self.mpos - viewport[0])/(viewport[2] - viewport[0])
+
+        if (self.mpos >= viewport[0] and self.mpos <= viewport[2]):
+            self.update_mouse_tracker(self.mpos)
         dx = x
         data_str = ""
+        i = 0
         for _data in self.data :
             df = _data.query('index >='+f'{dx:.5f}').iloc[:1]
             y=0
@@ -279,7 +284,9 @@ class Graph2d(Round2Dtemplate):
                 x = df.index[0]
                 y = df.values[0][0]
                 if(len(data_str) > 0) : data_str += "\n"
+                self.update_marker(i, x, y)
                 data_str += self.get_disp_format_string(x, y, len(_data.index))
+            i += 1
         self.text_top_right = data_str
 
     def calAxis(self, x: list, y: list):
@@ -421,10 +428,13 @@ class Graph2d(Round2Dtemplate):
         y = [item for sublist in y_values for item in sublist]
         self.data.append(df)
         self.calAxis(x_values, y)
+        self.plot()
 
     def draw_mouse_tracker(self):
         if(self.mpos <= self.view_port[0] 
                 or self.mpos >= self.view_port[2]):
+            self.tracker_points = None
+            self.tracker_line = None
             return
         pt:list = []
         x = self.mpos
@@ -433,20 +443,39 @@ class Graph2d(Round2Dtemplate):
         pt.append(x)
         pt.append(self.view_port[3])
         self.kivy_instructions.add(Color(1, 0, 0, 0.7)) # axis color
-        self.kivy_instructions.add(Line(points=pt, width=1))
-        pt.clear()
+        self.tracker_line = Line(points=pt, width=1)
+        self.kivy_instructions.add(self.tracker_line)
         viewport = self.view_port
         x_range = self.x_range
         dx = x_range[0] + (x_range[1] - x_range[0]) \
                 * (self.mpos - viewport[0])/(viewport[2] - viewport[0])
         self.kivy_instructions.add(Color(249/255, 253/255, 127/255, 1)) # marker color
         # display a marker at real data point.
+        self.tracker_points = []
         for df in self.data :
             data = df.query('index >='+f'{dx:.5f}').iloc[:1]
             if(len(data) == 1):
                 x = viewport[0] + (data.index[0] - self.x_range[0])*self.r_x
                 y = viewport[1] + (data.values[0][0]- self.y_range[0])*self.r_y
-                self.kivy_instructions.add(Line(circle=(x, y, 5), width = 1))
+                tracker = Line(circle=(x, y, 5), width = 1)
+                self.tracker_points.append(tracker)
+                self.kivy_instructions.add(tracker)
+    def update_mouse_tracker(self, x):
+        if self.tracker_line == None : self.draw_mouse_tracker()
+        if self.tracker_line == None : return
+        pt:list = []
+        pt.append(x)
+        pt.append(self.view_port[1])
+        pt.append(x)
+        pt.append(self.view_port[3])
+        self.tracker_line.points=pt
+
+    def update_marker(self, i, dx, dy):
+        if self.tracker_points == None : return
+        viewport = self.view_port
+        x = viewport[0] + (dx - self.x_range[0])*self.r_x
+        y = viewport[1] + (dy - self.y_range[0])*self.r_y
+        self.tracker_points[i].circle=(x, y, 5)
 
     def plot(self):
         self.create_tick(3)
@@ -468,11 +497,10 @@ class Graph2d(Round2Dtemplate):
         _data = pd.DataFrame(y, index=x, columns=['y'])
         self.data.append(_data)
         self.calAxis(x, y)
+        self.plot()
 
     def update(self, instr):
-        super().resize(instr)
-        if( len(self.data) > 0 ):
-            self.plot()
+        super().update(instr)
 
     def resize(self, *args):
         super().resize(*args)

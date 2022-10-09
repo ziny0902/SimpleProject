@@ -19,23 +19,30 @@ class Glcanvas(MDRelativeLayout):
         EventLoop.ensure_window()
         super(Glcanvas, self).__init__(**kwargs)
         with self.canvas:
+            self.fbo = Fbo ( with_depthbuffer = True, size=self.size, clear_color=(0., 0., 0., 0.))
+            self.viewport = Rectangle(size=self.size, pos=self.pos, texture=self.fbo.texture)
             self.cb = Callback(self.update, reset_context=False)
-            self.fbo = Fbo (with_depthbuffer = True, size=self.size, clear_color=(0., 0., 0., 0.))
-            self.viewport = Rectangle(size=self.size, pos=self.pos)
+        with self.fbo.before:
+            self.bcb = Callback(self.clearfbo, reset_context=False)
         self.bind(pos=self.resize)
         self.bind(size=self.resize)
         Clock.schedule_interval(self.frame, 1 / 60.)
 
     def resize(self, *args):
         args = args
+        self.viewport.size = self.size
         self.fbo.size = self.size
         self.viewport.texture = self.fbo.texture
-        self.viewport.size = self.size
 
     def update(self, instr):
         pass
+
     def frame(self, delta):
         pass
+
+    def clearfbo(self, instr):
+        self.fbo.clear_buffer()
+
     def normalize(self, vertices):
         new_vertices=[]
         sz = self.size

@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 from kivy.graphics import Mesh, RenderContext, Callback
-from kivy.graphics.opengl import  glEnable, glDisable, glDepthFunc,  GL_LESS, GL_DEPTH_TEST
+from kivy.graphics.opengl import  glEnable, glDisable, glDepthFunc, glCullFace, glFrontFace,\
+                                GL_LESS, GL_DEPTH_TEST, GL_CULL_FACE, GL_BACK, GL_CCW
 from kivy.graphics.opengl import glBlendFunc, GL_ONE, GL_ONE_MINUS_SRC_ALPHA,\
                                 GL_SRC_ALPHA
 from util import *
+import math
+from kivy.graphics.transformation import Matrix
 
 class Renderer3D():
     vs_src = '''
@@ -11,6 +14,7 @@ class Renderer3D():
     precision highp float;
     uniform mat4 projection_mat;
     uniform mat4 modelview_mat;
+    uniform mat4 lookat;
 	in vec3 IN_pos;
 	in float IN_color;
 	in vec3 IN_barycentric;
@@ -30,7 +34,7 @@ class Renderer3D():
     }
 
 	void main(){
-		vec4 pos = modelview_mat * vec4(IN_pos,  1);
+		vec4 pos = lookat * modelview_mat * vec4(IN_pos,  1);
 		gl_Position = projection_mat * pos;
 		frac_color = EncodeFloatRGBA( IN_color );
 		frac_lineColor = EncodeFloatRGBA( IN_lineColor );
@@ -53,6 +57,7 @@ class Renderer3D():
         float mask= smoothstep(-1, 2*f_width - 1, -1*f_closest_edge); 
 	    vec4 color = frac_color + (frac_lineColor - frac_color*frac_lineColor.a)*f_alpha;
         OUT_color = color*mask;
+        //OUT_color = frac_lineColor;
 	}
     '''
     attr_layout = [
@@ -66,8 +71,9 @@ class Renderer3D():
         self.renderer = RenderContext(compute_normal_mat=True)
         self.renderer.shader.vs = self.vs_src
         self.renderer.shader.fs = self.fs_src
-        from kivy.graphics.transformation import Matrix
-        self.modelview_mat = Matrix().translate(0, 0, -2) 
+        self.setup_camera([0, -1, 1.5], [0, 0, 0], [0, 1, 0])
+        self.setup_projection(680, 480, 0.1, 100)
+        self.modelview_mat = Matrix()
 
 
     def drawTriangle(self, a, b, c, fcolor, lcolor):
@@ -85,28 +91,54 @@ class Renderer3D():
     def setup_gl_context(self, *args):
         glEnable(GL_DEPTH_TEST)
         glDepthFunc(GL_LESS)
+        glEnable(GL_CULL_FACE)
+        glCullFace(GL_BACK)
+        glFrontFace(GL_CCW)
         # need for proper rendering
         glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
         pass
 
     def reset_gl_context(self, *args):
         glDisable(GL_DEPTH_TEST)
+        glDisable(GL_CULL_FACE)
         # kivy default blend function value
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         pass
-    def setup_projection(self, width, height):
-        from kivy.graphics.transformation import Matrix
+    ##
+    # c: camera, t: target
+    ##
+    def setup_camera(self, c:list, t:list, up:list):
+        lookat = Matrix().look_at(c[0], c[1], c[2], t[0], t[1], t[2],  up[0], up[1], up[2])
+        self.renderer['lookat'] = lookat
+
+    def setup_projection(self, width, height, rear:float, far:float):
         asp = width / float(height)
-        proj = Matrix().view_clip(-asp, asp, -1, 1, 1, 100, 1)
-        self.renderer['projection_mat'] = proj
+        # proj = Matrix().view_clip(-asp, asp, -1, 1, 1, 100, 1)
+        perspective = Matrix()
+        perspective.perspective(90, asp, rear, far)
+        # self.renderer['projection_mat'] = proj
+        self.renderer['projection_mat'] = perspective
 
     ##
     # angle : degree
     ##
     def rotate(self, angle:float, axis:list):
-        self.modelview_mat.rotate((2*angle*3.14)/360, axis[0], axis[1], axis[2])
+        self.renderer["modelview_mat"]=Matrix().rotate(math.radians(angle), axis[0], axis[1], axis[2])
+    def rotate_x(self, angle:float ):
+        self.modelview_mat.rotate((2*angle*math.pi)/360, 1, 0, 0)
         self.renderer["modelview_mat"]=self.modelview_mat
-
+    def rotate_y(self, angle:float ):
+        self.modelview_mat.rotate((2*angle*math.pi)/360, 0, 1, 0)
+        self.renderer["modelview_mat"]=self.modelview_mat
+    def rotate_z(self, angle:float ):
+        self.modelview_mat.rotate((2*angle*math.pi)/360, 0, 0, 1)
+        self.renderer["modelview_mat"]=self.modelview_mat
+    def translate(self, x:float, y:float, z:float):
+        self.modelview_mat.translate(x, y, z)
+        self.renderer["modelview_mat"]=self.modelview_mat
+    ##
+    # TODO: camera, view setting
+    ##
 
     def flush(self):
         if len(self.vertexes_list) <= 0:
@@ -124,8 +156,6 @@ class Renderer3D():
 
         from kivy.graphics import PushMatrix, PopMatrix
         self.renderer.clear()
-        self.modelview_mat.rotate((2*1*3.14)/360, 1, 1, 1)
-        self.renderer["modelview_mat"]=self.modelview_mat
         with self.renderer:
             PushMatrix()
             self.cb = Callback(self.setup_gl_context)
