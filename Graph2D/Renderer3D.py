@@ -2,10 +2,13 @@
 from kivy.graphics import Mesh, RenderContext, Callback
 from kivy.graphics.opengl import  glEnable, glDisable, glDepthFunc, glCullFace, glFrontFace,\
                                 GL_LESS, GL_DEPTH_TEST, GL_CULL_FACE, GL_BACK, GL_CCW
-from kivy.graphics.opengl import glBlendFunc, GL_ONE, GL_ONE_MINUS_SRC_ALPHA,\
-                                GL_SRC_ALPHA
+# from kivy.graphics.opengl import glBlendFunc, GL_ONE, GL_ONE_MINUS_SRC_ALPHA,\
+#                                 GL_SRC_ALPHA
 from util import *
 import math
+import numpy as np
+from enum import Enum, auto
+
 from kivy.graphics.transformation import Matrix
 
 class Renderer3D():
@@ -34,8 +37,8 @@ class Renderer3D():
     }
 
 	void main(){
-		vec4 pos = lookat * modelview_mat * vec4(IN_pos,  1);
-		gl_Position = projection_mat * pos;
+		vec4 pos = projection_mat * lookat * modelview_mat * vec4(IN_pos,  1);
+		gl_Position = pos;
 		frac_color = EncodeFloatRGBA( IN_color );
 		frac_lineColor = EncodeFloatRGBA( IN_lineColor );
 		frac_barycentric = IN_barycentric;
@@ -68,15 +71,230 @@ class Renderer3D():
     ]
     def __init__(self, **kwargs):
         self.vertexes_list:list = []
+        self.fan_list=[]
         self.renderer = RenderContext(compute_normal_mat=True)
         self.renderer.shader.vs = self.vs_src
         self.renderer.shader.fs = self.fs_src
-        self.setup_camera([0, -1, 1.5], [0, 0, 0], [0, 1, 0])
-        self.setup_projection(680, 480, 0.1, 100)
+        self.setup_camera([0, 0, 2], [0, 0, 0], [0, 1, 0])
+        self.setup_projection(60, 680, 480, 0.1, 100)
         self.modelview_mat = Matrix()
 
+    ##
+    # size : R, height
+    ##
+    def drawCone(self, center:list, size:list, fillColor:list, lineColor:list, density:int= 10):
+        t= np.array(center)
+        cp = np.array([0, 1, 0])  * size[1] + t
+        bcp = [0, 0, 0] + t
+        unit_step = 2*math.pi/(density)
+        for i in range(0, density) :
+            p1 = np.array([math.sin(i*unit_step), 0, math.cos(i*unit_step)]) * size[0] + t
+            p2 = np.array([math.sin((i+1)*unit_step), 0, math.cos((i+1)*unit_step)]) * size[0] + t
+            self.drawTriangle( 
+                    cp,
+                    p1,
+                    p2,
+                    # fillColor,
+                    [0, 0, 100+i*10, 255],
+                    # [0, 0, 100+i*10, 0],
+                    lineColor, size, t)
+            self.drawTriangle( 
+                    bcp,
+                    p2,
+                    p1,
+                    # fillColor,
+                    [155, 155, 155, 255],
+                    # [0, 0, 100+i*10, 0],
+                    lineColor, size, t)
+    def drawCylinder(self, center:list, size:list, fillColor:list, lineColor:list, density:int= 10):
+        t= np.array(center)
+        tcp = np.array([0, 1, 0])  * size[1] + t
+        bcp = np.array([0, 0, 0]) + t
+        unit_step = 2*math.pi/(density)
+        for i in range(0, density) :
+            p1 = np.array([math.sin(i*unit_step), 0, math.cos(i*unit_step)]) * size[0] + t
+            p2 = np.array([math.sin((i+1)*unit_step), 0, math.cos((i+1)*unit_step)]) * size[0] + t
+            p3 = p1 + [0,1,0]*size[1]
+            p4 = p2 + [0,1,0]*size[1]
+            self.drawTriangle( 
+                    p3,
+                    p1,
+                    p2,
+                    fillColor,
+                   lineColor, size, t)
+            self.drawTriangle( 
+                    p2,
+                    p4,
+                    p3,
+                    fillColor,
+                   lineColor, size, t)
+            self.drawTriangle( 
+                    bcp,
+                    p2,
+                    p1,
+                    fillColor,
+                   lineColor, size, t)
 
-    def drawTriangle(self, a, b, c, fcolor, lcolor):
+            self.drawTriangle( 
+                    tcp,
+                    p3,
+                    p4,
+                    fillColor,
+                    lineColor, size, t)
+    def drawSphere(self, center, size, fillColor, lineColor, density:int = 20):
+        t = np.array(center)
+        unit_step = 2*math.pi/density
+        #
+        # spe
+        #  |
+        # sps
+        #
+        for j in range(0, density):
+            sps = np.array([ 0, math.sin(j*unit_step), math.cos(j*unit_step) ])
+            spe = np.array([ 0, math.sin((j+1) * unit_step), math.cos((j+1) * unit_step) ])
+            #
+            # p2---p4
+            # |    |
+            # p1---p3
+            #
+            for i in range(0, density):
+                p1 = np.array([sps[2]*math.sin(i*unit_step), sps[1], sps[2]*math.cos(i*unit_step)]) * size[0] + t
+                p2 = np.array([spe[2]*math.sin(i*unit_step), spe[1], spe[2]*math.cos(i*unit_step)]) * size[0] + t
+                p3 = np.array([sps[2]*math.sin((i+1)*unit_step), sps[1], sps[2]*math.cos((i+1)*unit_step)]) * size[0] + t
+                p4 = np.array([spe[2]*math.sin((i+1)*unit_step), spe[1], spe[2]*math.cos((i+1)*unit_step)]) * size[0] + t
+                self.drawTriangle( 
+                        p1,
+                        p4,
+                        p2,
+                        fillColor,
+                       lineColor, size, t)
+                self.drawTriangle( 
+                        p1,
+                        p3,
+                        p4,
+                        fillColor,
+                       lineColor, size, t)
+
+    def drawPyramid(self, center, size, fillColor, lineColor):
+        class Etag(Enum):
+            cp = 0
+            lt = auto()
+            lb = auto()
+            rt = auto()
+            rb = auto()
+
+        t= np.array(center)
+        cp = np.array([0, 1, 0])  *size + t
+        lt = np.array([-1, 0, 1]) *size + t
+        lb = np.array([-1, 0, -1])*size + t
+        rt = np.array([1, 0, 1])  *size + t
+        rb = np.array([1, 0, -1]) *size + t
+
+        vertices:list = [ cp, lt, lb, rt, rb ]
+        indices:list = [
+                Etag.cp.value, Etag.lb.value, Etag.lt.value,
+                Etag.cp.value, Etag.rb.value, Etag.lb.value,
+                Etag.cp.value, Etag.rt.value, Etag.rb.value,
+                Etag.cp.value, Etag.lt.value, Etag.rt.value,
+                Etag.lb.value, Etag.rt.value, Etag.lt.value,
+                Etag.lb.value, Etag.rb.value, Etag.rt.value,
+                ]
+        colorlist = [
+                [155, 0, 0, 255],
+                [0, 155, 0, 255],
+                [0, 0, 155, 255],
+                [50, 50, 50, 255],
+                [155, 155, 155, 255],
+                [155, 155, 155, 255],
+                ]
+        length = len(indices)
+        for i in range(0, length, 3):
+            self.drawTriangle( 
+                    vertices[ indices[i]   ],
+                    vertices[ indices[i+1] ],
+                    vertices[ indices[i+2] ],
+                    fillColor,
+                    # colorlist[int(i/3)],
+                    lineColor, size, t)
+
+    ##
+    # size: width, height, depth
+    ##
+    def drawCube(self, center, size, fillColor, lineColor):
+        class Etag(Enum):
+            f_lb = 0
+            f_lt = auto()
+            f_rt = auto()
+            f_rb = auto()
+            b_lb = auto()
+            b_lt = auto()
+            b_rt = auto()
+            b_rb = auto()
+        
+        # translate vector
+        t= np.array(center)
+        #front left bottom #0
+        f_lb= np.array([-1, -1, -1 ])*size + t
+        #front left top #1
+        f_lt= np.array([-1, 1, -1 ])*size + t
+        #front right top #2
+        f_rt= np.array([1, 1, -1 ])*size + t 
+        #front right bottom #3 
+        f_rb= np.array([1, -1, -1 ])*size + t 
+        #back left bottom #4
+        b_lb= np.array([-1, -1, 1 ])*size + t 
+        #front left top #5
+        b_lt= np.array([-1, 1, 1 ])*size + t 
+        #front right top #6
+        b_rt= np.array([1, 1, 1 ])*size + t 
+        #front right bottom #7 
+        b_rb= np.array([1, -1, 1 ])*size + t 
+        indices = \
+        [ 
+            # front
+          Etag.f_lb.value, Etag.f_lt.value, Etag.f_rt.value,
+          Etag.f_lb.value, Etag.f_rt.value, Etag.f_rb.value,
+
+          # back
+          Etag.b_lb.value, Etag.b_rt.value, Etag.b_lt.value,
+          Etag.b_lb.value, Etag.b_rb.value, Etag.b_rt.value,
+          
+          #side R
+          Etag.f_rb.value, Etag.f_rt.value, Etag.b_rt.value,
+          Etag.f_rb.value, Etag.b_rt.value, Etag.b_rb.value,
+
+          #side L
+          Etag.f_lb.value, Etag.b_lt.value, Etag.f_lt.value,
+          Etag.f_lb.value, Etag.b_lb.value, Etag.b_lt.value,
+
+          # top
+          Etag.f_lt.value, Etag.b_lt.value, Etag.b_rt.value,
+          Etag.f_lt.value, Etag.b_rt.value, Etag.f_rt.value,
+
+          #bottom
+          Etag.f_lb.value, Etag.b_rb.value, Etag.b_lb.value,
+          Etag.f_lb.value, Etag.f_rb.value, Etag.b_rb.value 
+        ] 
+        vertices:list =[
+            f_lb,
+            f_lt,
+            f_rt,
+            f_rb,
+            b_lb,
+            b_lt,
+            b_rt,
+            b_rb,
+        ]
+        length = len(indices)
+        for i in range(0, length, 3):
+            self.drawTriangle( 
+                    vertices[ indices[i]   ],
+                    vertices[ indices[i+1] ],
+                    vertices[ indices[i+2] ],
+                    fillColor,
+                    lineColor, size, t)
+
+    def drawTriangle(self, a, b, c, fcolor, lcolor, scale, translate):
         vertexes = {}
         fc = cpTorgba(fcolor)
         lc = cpTorgba(lcolor)
@@ -87,6 +305,8 @@ class Renderer3D():
                 c[0], c[1], c[2], fc, 0., 0., 1.0, lc
             ]
         self.vertexes_list.append(vertexes)
+        vertexes['scale'] = scale
+        vertexes['translate'] = translate 
 
     def setup_gl_context(self, *args):
         glEnable(GL_DEPTH_TEST)
@@ -95,14 +315,14 @@ class Renderer3D():
         glCullFace(GL_BACK)
         glFrontFace(GL_CCW)
         # need for proper rendering
-        glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
+        # glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
         pass
 
     def reset_gl_context(self, *args):
         glDisable(GL_DEPTH_TEST)
         glDisable(GL_CULL_FACE)
         # kivy default blend function value
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         pass
     ##
     # c: camera, t: target
@@ -111,12 +331,10 @@ class Renderer3D():
         lookat = Matrix().look_at(c[0], c[1], c[2], t[0], t[1], t[2],  up[0], up[1], up[2])
         self.renderer['lookat'] = lookat
 
-    def setup_projection(self, width, height, rear:float, far:float):
+    def setup_projection(self, pov:float, width, height, rear:float, far:float):
         asp = width / float(height)
-        # proj = Matrix().view_clip(-asp, asp, -1, 1, 1, 100, 1)
         perspective = Matrix()
-        perspective.perspective(90, asp, rear, far)
-        # self.renderer['projection_mat'] = proj
+        perspective.perspective(pov, asp, rear, far)
         self.renderer['projection_mat'] = perspective
 
     ##
@@ -136,16 +354,17 @@ class Renderer3D():
     def translate(self, x:float, y:float, z:float):
         self.modelview_mat.translate(x, y, z)
         self.renderer["modelview_mat"]=self.modelview_mat
-    ##
-    # TODO: camera, view setting
-    ##
 
     def flush(self):
+        from kivy.graphics import PushMatrix, PopMatrix
+        from kivy.graphics.context_instructions import Scale , Translate
+        self.renderer.clear()
         if len(self.vertexes_list) <= 0:
             return
         ##
         # polygon
         ##
+
         vertices=[]
         indices=[]
         for vertexes in self.vertexes_list:

@@ -13,8 +13,6 @@ from kivy.graphics.fbo import Fbo
 #class Glcanvas(RelativeLayout):
 from kivymd.uix.relativelayout import MDRelativeLayout 
 class Glcanvas(MDRelativeLayout):
-    Resolution = (0.0, 0.0, 0.0, 0.0)
-    Screen = (0.0,0.0)
     def __init__(self, **kwargs):
         EventLoop.ensure_window()
         super(Glcanvas, self).__init__(**kwargs)

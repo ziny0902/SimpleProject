@@ -9,6 +9,7 @@ from kivy.graphics.instructions import InstructionGroup
 from kivy.core.window import Window
 from kivy.properties import StringProperty
 from kivy.lang import Builder
+import math
 
 class Round2Dtemplate(Glcanvas):
     Builder.load_string(
@@ -61,7 +62,8 @@ class Round2Dtemplate(Glcanvas):
 
     def resize(self, *args):
         super().resize(*args)
-        self.renderer3d.setup_projection(self.width, self.height, 0.1, 100)
+        self.pov:float = 60.
+        self.renderer3d.setup_projection(self.pov, self.width, self.height, 0.1, 100)
 
     def frame(self, delta):
         super().frame(delta)
@@ -92,13 +94,16 @@ class TemplateTest(Round2Dtemplate):
         self.setup_scene()
         self.angle=0
         self.mouse_pos = (0, 0)
+        self.renderer3d.setup_camera([0, 0, 10], [0, 0, 0], [0, 1, 0])
 
     def frame(self, delta):
         delta = delta
-        # self.renderer3d.rotate(delta,self.width, self.height)
         super().frame(delta)
         self.angle += 1
-        self.renderer3d.rotate(self.angle, [1, 1, 1])
+        # self.renderer3d.rotate(self.angle, [1, 0, 0])
+        cam_x = 10*math.sin( math.radians(self.angle) )
+        cam_y = 10*math.cos( math.radians(self.angle) )
+        self.renderer3d.setup_camera([cam_x, 0, cam_y], [0, 0, 0], [0, 1, 0])
         x, y = self.mouse_pos
         if x > self.pos[0] and x < self.pos[0]+ self.size[0]\
             and y > self.pos[1] and y < self.pos[1] + self.size[1]:
@@ -109,25 +114,40 @@ class TemplateTest(Round2Dtemplate):
         pass
 
     def on_mouse_move(self, window, pos):
+        diffx, diffy = self.mouse_pos 
+        diffx -= pos[0]
+        diffy -= pos[1]
         self.mouse_pos = pos
+        cam_x = 1*math.sin(math.radians(pos[0]))
+        cam_y = 1*math.cos(math.radians(pos[1]))
+        # self.renderer3d.setup_camera([cam_x, 0, 2+cam_y], [0, 0, 0], [0, 1, 0])
 
     def setup_scene(self):
         #print("[DEBUG] display")
         # pos, angle, r, out, fill
         # test data.
         #3d rendering test
-        triangle = [  [ 0.0, -0.25, -0.50],
-                [ 0.0,  0.25,  0.00],
-                [ 0.5, -0.25,  0.25],
-                [-0.5, -0.25,  0.25] ];
-        self.renderer3d.drawTriangle(triangle[2], triangle[1], triangle[3], [0, 255, 0, 255], [255, 255, 255, 255])
-        self.renderer3d.drawTriangle(triangle[3], triangle[1], triangle[0], [35, 55, 155, 255], [255, 255, 255, 255])
-        self.renderer3d.drawTriangle(triangle[0], triangle[1], triangle[2], [155, 0, 0, 255], [255, 255, 155, 255])
-        self.renderer3d.drawTriangle(triangle[3], triangle[0], triangle[2], [155, 155, 155, 255], [255, 255, 255, 255])
+        # triangle = [  [ 0.0, -0.25, -0.50],
+        #         [ 0.0,  0.25,  0.00],
+        #         [ 0.5, -0.25,  0.25],
+        #         [-0.5, -0.25,  0.25] ];
+        # self.renderer3d.drawTriangle(triangle[2], triangle[1], triangle[3], [0, 255, 0, 255], [255, 255, 255, 255], [1,1,1], [0,0,0])
+        # self.renderer3d.drawTriangle(triangle[3], triangle[1], triangle[0], [35, 55, 155, 255], [255, 255, 255, 255], [1,1,1], [0,0,0])
+        # self.renderer3d.drawTriangle(triangle[0], triangle[1], triangle[2], [155, 0, 0, 255], [255, 255, 155, 255], [1,1,1], [0,0,0])
+        # self.renderer3d.drawTriangle(triangle[3], triangle[0], triangle[2], [155, 155, 155, 255], [255, 255, 255, 255], [1,1,1], [0,0,0])
         # self.renderer3d.drawTriangle(triangle[2], triangle[1], triangle[3], [0, 255, 0, 255], [0, 0, 0, 255])
         # self.renderer3d.drawTriangle(triangle[3], triangle[1], triangle[0], [35, 55, 155, 255], [0, 0, 0, 255])
         # self.renderer3d.drawTriangle(triangle[0], triangle[1], triangle[2], [155, 0, 0, 255], [0, 0, 0, 255])
         # self.renderer3d.drawTriangle(triangle[3], triangle[0], triangle[2], [155, 155, 155, 255], [0, 0, 0, 255])
+        ##
+        # drawCube( center, size, fill, line )
+        ##
+        self.renderer3d.drawCube( [2, 0, 2], [0.5, 0.5, 0.3], [0, 155, 0, 255], [255, 255, 255, 255] )
+        self.renderer3d.drawPyramid( [0, 3, 0], [0.5, 1, 0.5], [155, 0, 0, 255], [255, 255, 255, 255])
+        self.renderer3d.drawCone( [-2, 3, 0], [0.5, 1], [155, 0, 0, 255], [255, 255, 255, 255])
+        self.renderer3d.drawCylinder( [2, -3, 0], [0.5, 1], [179, 127, 255, 255], [255, 255, 255, 255])
+        self.renderer3d.drawSphere( [0, 2, 1], [1, 1], [155, 155, 155, 255], [255, 255, 255, 255])
+        ##
 
 
         self.round2d.drawCircle([300, 300], 0, 50, [255, 255, 255, 255], [179, 127, 255, 255])
