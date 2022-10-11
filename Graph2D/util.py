@@ -50,10 +50,20 @@ def vMul(a, b):
 def vUnitforangle(angle):
     return [math.cos(angle), math.sin(angle)]
 
-
 def vNomalize(t):
     v = [0]*2
     len = math.sqrt(t[0]*t[0] + t[1]*t[1])
     v[0] = 1.0*t[0]/(len + sys.float_info.min)
     v[1] = 1.0*t[1]/(len + sys.float_info.min)
     return v
+
+def rectangular_to_spherical(v:list) -> list :
+    import math
+    rho:float = math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]) 
+    phi = math.acos(v[2]/rho)
+    if( math.sin(phi) == 0 ) : theta = 0;
+    else : theta = math.acos( v[0] / (rho*math.sin(phi)) )
+    if(v[1] < 0) :
+        theta = 2*math.pi - theta
+    return [ rho, theta, phi ]
+

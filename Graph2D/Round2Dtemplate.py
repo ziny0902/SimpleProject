@@ -103,7 +103,7 @@ class TemplateTest(Round2Dtemplate):
         # self.renderer3d.rotate(self.angle, [1, 0, 0])
         cam_x = 10*math.sin( math.radians(self.angle) )
         cam_y = 10*math.cos( math.radians(self.angle) )
-        self.renderer3d.setup_camera([cam_x, 0, cam_y], [0, 0, 0], [0, 1, 0])
+        self.renderer3d.setup_camera([cam_x, 0, cam_y], [0, 0, 1], [0, 1, 0])
         x, y = self.mouse_pos
         if x > self.pos[0] and x < self.pos[0]+ self.size[0]\
             and y > self.pos[1] and y < self.pos[1] + self.size[1]:
@@ -142,36 +142,47 @@ class TemplateTest(Round2Dtemplate):
         ##
         # drawCube( center, size, fill, line )
         ##
+        import numpy as np
+        ptlist = []
+        for t in np.arange(0, math.pi*2, math.pi*2/30.) :
+            ptlist.append([math.cos(t), math.sin(t), t/(math.pi*2)])
+        self.renderer3d.drawLinestrip(ptlist, [255, 255, 255, 255])
         self.renderer3d.drawCube( [2, 0, 2], [0.5, 0.5, 0.3], [0, 155, 0, 255], [255, 255, 255, 255] )
-        self.renderer3d.drawPyramid( [0, 3, 0], [0.5, 1, 0.5], [155, 0, 0, 255], [255, 255, 255, 255])
-        self.renderer3d.drawCone( [-2, 3, 0], [0.5, 1], [155, 0, 0, 255], [255, 255, 255, 255])
+        self.renderer3d.drawPyramid( [0, 3, 0], [1, 0.5, 0.5], [155, 0, 0, 255], [255, 255, 255, 255])
+        self.renderer3d.drawPyramid( [-1, 0, 0], [1, 0.5, 0.5], [155, 0, 0, 255], [255, 255, 255, 255], [0, -1, -1])
+        self.renderer3d.drawCone( [-2, 3, 0], [0.5, 1], [155, 0, 0, 255], [255, 255, 255, 255], [1, -1, 1])
+        self.renderer3d.drawCone( [2, 2, 0], [0.5, 1.5], [155, 0, 0, 255], [255, 255, 255, 255])
         self.renderer3d.drawCylinder( [2, -3, 0], [0.5, 1], [179, 127, 255, 255], [255, 255, 255, 255])
-        self.renderer3d.drawSphere( [0, 2, 1], [1, 1], [155, 155, 155, 255], [255, 255, 255, 255])
+        self.renderer3d.drawCylinder( [-2, -3, 0], [0.5, 2], [179, 127, 255, 255], [255, 255, 255, 255], [1, 1, 0])
+        self.renderer3d.drawSphere( [0, 2, 1], [1, 1], [155, 155, 155, 0], [255, 255, 255, 255])
         ##
 
 
-        self.round2d.drawCircle([300, 300], 0, 50, [255, 255, 255, 255], [179, 127, 255, 255])
-        self.round2d.drawPolygon(
-                4,
-                [[1000, 100], [1000,150], [400, 150], [400, 100]],
-                10.,
-                [255, 255, 255, 255],
-                [179, 127, 255, 255]
-                )
-        self.round2d.drawPolygon(
-                5,
-                [[500, 300], [500, 400],  [450, 450], [400,400], [400, 300] ],
-                5.,
-                [255, 255, 255, 255],
-                [179, 127, 255, 255]
-                )
-        self.textdraw.puts("TEST", 330, 400, [230, 226, 114, 255])
-        self.kivy_instructions.clear()
-        self.kivy_instructions.add(Color(1,0,0))
-        self.kivy_instructions.add(Rectangle(pos=(100, 480), size=(100, 100)))
-        self.kivy_instructions.add(Line(points=[100, 200, 200, 200, 100, 300], width=1))
-        self.kivy_instructions.add(Color(1,1,1))
-        self.kivy_instructions.add(self.mouse_circle)
+        ##
+        # 2D Graphics example
+        ##
+        # self.round2d.drawCircle([300, 300], 0, 50, [255, 255, 255, 255], [179, 127, 255, 255])
+        # self.round2d.drawPolygon(
+        #         4,
+        #         [[1000, 100], [1000,150], [400, 150], [400, 100]],
+        #         10.,
+        #         [255, 255, 255, 255],
+        #         [179, 127, 255, 255]
+        #         )
+        # self.round2d.drawPolygon(
+        #         5,
+        #         [[500, 300], [500, 400],  [450, 450], [400,400], [400, 300] ],
+        #         5.,
+        #         [255, 255, 255, 255],
+        #         [179, 127, 255, 255]
+        #         )
+        # self.textdraw.puts("TEST", 330, 400, [230, 226, 114, 255])
+        # self.kivy_instructions.clear()
+        # self.kivy_instructions.add(Color(1,0,0))
+        # self.kivy_instructions.add(Rectangle(pos=(100, 480), size=(100, 100)))
+        # self.kivy_instructions.add(Line(points=[100, 200, 200, 200, 100, 300], width=1))
+        # self.kivy_instructions.add(Color(1,1,1))
+        # self.kivy_instructions.add(self.mouse_circle)
         self.drawFlushRenderer()
 
     def update(self, instr ):

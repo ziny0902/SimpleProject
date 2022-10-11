@@ -2,8 +2,8 @@
 from kivy.graphics import Mesh, RenderContext, Callback
 from kivy.graphics.opengl import  glEnable, glDisable, glDepthFunc, glCullFace, glFrontFace,\
                                 GL_LESS, GL_DEPTH_TEST, GL_CULL_FACE, GL_BACK, GL_CCW
-# from kivy.graphics.opengl import glBlendFunc, GL_ONE, GL_ONE_MINUS_SRC_ALPHA,\
-#                                 GL_SRC_ALPHA
+from kivy.graphics.opengl import glBlendFunc, GL_ONE, GL_ONE_MINUS_SRC_ALPHA,\
+                                GL_SRC_ALPHA
 from util import *
 import math
 import numpy as np
@@ -56,11 +56,9 @@ class Renderer3D():
 	    float f_closest_edge = min(frac_barycentric.x,
         min(frac_barycentric.y, frac_barycentric.z)); // see to which edge this pixel is the closest
         float f_width = fwidth(f_closest_edge); // calculate derivative (divide f_thickness by this to have the line width constant in screen-space)
-        float f_alpha = smoothstep(1.0 -2* f_width, 1.0, 1 - f_closest_edge); // calculate alpha
-        float mask= smoothstep(-1, 2*f_width - 1, -1*f_closest_edge); 
+        float f_alpha = smoothstep(1.0 - f_width, 1.0, 1 - f_closest_edge); // calculate alpha
 	    vec4 color = frac_color + (frac_lineColor - frac_color*frac_lineColor.a)*f_alpha;
-        OUT_color = color*mask;
-        //OUT_color = frac_lineColor;
+        OUT_color = color;
 	}
     '''
     attr_layout = [
@@ -71,7 +69,7 @@ class Renderer3D():
     ]
     def __init__(self, **kwargs):
         self.vertexes_list:list = []
-        self.fan_list=[]
+        self.linestrip_list:list = []
         self.renderer = RenderContext(compute_normal_mat=True)
         self.renderer.shader.vs = self.vs_src
         self.renderer.shader.fs = self.fs_src
@@ -79,69 +77,100 @@ class Renderer3D():
         self.setup_projection(60, 680, 480, 0.1, 100)
         self.modelview_mat = Matrix()
 
+
     ##
     # size : R, height
+    # dir : direction vector
     ##
-    def drawCone(self, center:list, size:list, fillColor:list, lineColor:list, density:int= 10):
+    def drawCone(self, center:list, size:list, fillColor:list, lineColor:list, dir:list=[0, 1, 0], density:int= 10):
         t= np.array(center)
-        cp = np.array([0, 1, 0])  * size[1] + t
-        bcp = [0, 0, 0] + t
+        angle:float = rectangular_to_spherical(dir)
+        print(angle)
+        angle[1] = -angle[1]
+        angle[2] = math.pi/2 - angle[2]
+        R = Matrix()
+        R.rotate(angle[1], 0, 0, 1)
+        R.rotate(angle[2], 0, 1, 0)
+        R = np.delete( np.array(R.tolist()), 3, 1 )
+        R = np.delete( R, 3, 0)
+
+        cp = np.array([size[1], 0, 0])  * size[1] 
+        bcp = np.array([0, 0, 0] )
+        cp  = np.matmul(R, cp.T)  + t
+        bcp = np.matmul(R, bcp.T) + t
         unit_step = 2*math.pi/(density)
         for i in range(0, density) :
-            p1 = np.array([math.sin(i*unit_step), 0, math.cos(i*unit_step)]) * size[0] + t
-            p2 = np.array([math.sin((i+1)*unit_step), 0, math.cos((i+1)*unit_step)]) * size[0] + t
+            p1 = np.array([0, math.sin(i*unit_step), math.cos(i*unit_step)]) * size[0]
+            p2 = np.array([0, math.sin((i+1)*unit_step), math.cos((i+1)*unit_step)]) * size[0]
+            p1 = np.matmul(R,p1.T) + t
+            p2 = np.matmul(R,p2.T) + t
             self.drawTriangle( 
                     cp,
-                    p1,
                     p2,
+                    p1,
                     # fillColor,
                     [0, 0, 100+i*10, 255],
                     # [0, 0, 100+i*10, 0],
                     lineColor, size, t)
             self.drawTriangle( 
                     bcp,
-                    p2,
                     p1,
+                    p2,
                     # fillColor,
                     [155, 155, 155, 255],
                     # [0, 0, 100+i*10, 0],
                     lineColor, size, t)
-    def drawCylinder(self, center:list, size:list, fillColor:list, lineColor:list, density:int= 10):
+
+    def drawCylinder(self, center:list, size:list, fillColor:list, lineColor:list, dir:list=[0, 1, 0], density:int= 10):
         t= np.array(center)
-        tcp = np.array([0, 1, 0])  * size[1] + t
-        bcp = np.array([0, 0, 0]) + t
+        angle:float = rectangular_to_spherical(dir)
+        print(angle)
+        angle[1] = -angle[1]
+        angle[2] = math.pi/2 - angle[2]
+        R = Matrix()
+        R.rotate(angle[1], 0, 0, 1)
+        R.rotate(angle[2], 0, 1, 0)
+        R = np.delete( np.array(R.tolist()), 3, 1 )
+        R = np.delete( R, 3, 0)
+        tcp = np.array([1, 0, 0])  * size[1]
+        bcp = np.array([0, 0, 0])
+        tcp = np.matmul(R, tcp.T) + t
+        bcp = np.matmul(R, bcp.T) + t
         unit_step = 2*math.pi/(density)
         for i in range(0, density) :
-            p1 = np.array([math.sin(i*unit_step), 0, math.cos(i*unit_step)]) * size[0] + t
-            p2 = np.array([math.sin((i+1)*unit_step), 0, math.cos((i+1)*unit_step)]) * size[0] + t
-            p3 = p1 + [0,1,0]*size[1]
-            p4 = p2 + [0,1,0]*size[1]
+            p1 = np.array([0, math.sin(i*unit_step), math.cos(i*unit_step)]) * size[0]
+            p2 = np.array([0, math.sin((i+1)*unit_step), math.cos((i+1)*unit_step)]) * size[0]
+            p3 = p1 + np.array([1,0,0])*size[1]
+            p4 = p2 + np.array([1,0,0])*size[1]
+            p1 = np.matmul(R, p1.T) + t
+            p2 = np.matmul(R, p2.T) + t
+            p3 = np.matmul(R, p3.T) + t
+            p4 = np.matmul(R, p4.T) + t
             self.drawTriangle( 
                     p3,
-                    p1,
                     p2,
+                    p1,
                     fillColor,
                    lineColor, size, t)
             self.drawTriangle( 
                     p2,
-                    p4,
                     p3,
+                    p4,
                     fillColor,
                    lineColor, size, t)
             self.drawTriangle( 
                     bcp,
-                    p2,
                     p1,
+                    p2,
                     fillColor,
                    lineColor, size, t)
-
             self.drawTriangle( 
                     tcp,
-                    p3,
                     p4,
+                    p3,
                     fillColor,
                     lineColor, size, t)
-    def drawSphere(self, center, size, fillColor, lineColor, density:int = 20):
+    def drawSphere(self, center, size, fillColor, lineColor, density:int = 40):
         t = np.array(center)
         unit_step = 2*math.pi/density
         #
@@ -162,20 +191,34 @@ class Renderer3D():
                 p2 = np.array([spe[2]*math.sin(i*unit_step), spe[1], spe[2]*math.cos(i*unit_step)]) * size[0] + t
                 p3 = np.array([sps[2]*math.sin((i+1)*unit_step), sps[1], sps[2]*math.cos((i+1)*unit_step)]) * size[0] + t
                 p4 = np.array([spe[2]*math.sin((i+1)*unit_step), spe[1], spe[2]*math.cos((i+1)*unit_step)]) * size[0] + t
-                self.drawTriangle( 
-                        p1,
-                        p4,
-                        p2,
-                        fillColor,
-                       lineColor, size, t)
-                self.drawTriangle( 
-                        p1,
-                        p3,
-                        p4,
-                        fillColor,
-                       lineColor, size, t)
+                if (j <= math.pi) :
+                    self.drawTriangle( 
+                            p1,
+                            p4,
+                            p2,
+                            fillColor,
+                           lineColor, size, t)
+                    self.drawTriangle( 
+                            p1,
+                            p3,
+                            p4,
+                            fillColor,
+                           lineColor, size, t)
+                else:
+                    self.drawTriangle( 
+                            p1,
+                            p2,
+                            p4,
+                            fillColor,
+                           lineColor, size, t)
+                    self.drawTriangle( 
+                            p1,
+                            p4,
+                            p3,
+                            fillColor,
+                           lineColor, size, t)
 
-    def drawPyramid(self, center, size, fillColor, lineColor):
+    def drawPyramid(self, center, size, fillColor, lineColor, dir:list=[0, 1, 0]):
         class Etag(Enum):
             cp = 0
             lt = auto()
@@ -184,11 +227,28 @@ class Renderer3D():
             rb = auto()
 
         t= np.array(center)
-        cp = np.array([0, 1, 0])  *size + t
-        lt = np.array([-1, 0, 1]) *size + t
-        lb = np.array([-1, 0, -1])*size + t
-        rt = np.array([1, 0, 1])  *size + t
-        rb = np.array([1, 0, -1]) *size + t
+
+        angle:float = rectangular_to_spherical(dir)
+        print(angle)
+        angle[1] = -angle[1]
+        angle[2] = math.pi/2 - angle[2]
+        R = Matrix()
+        R.rotate(angle[1], 0, 0, 1)
+        R.rotate(angle[2], 0, 1, 0)
+        R = np.delete( np.array(R.tolist()), 3, 1 )
+        R = np.delete( R, 3, 0)
+
+        cp = np.array([1, 0, 0])  *size
+        lt = np.array([0, 1, -1]) *size
+        lb = np.array([0, -1, -1])*size
+        rt = np.array([0, 1, 1])  *size
+        rb = np.array([0, -1, 1]) *size
+
+        cp = np.matmul(R, cp.T) + t
+        lt = np.matmul(R, lt.T) + t
+        lb = np.matmul(R, lb.T) + t
+        rt = np.matmul(R, rt.T) + t
+        rb = np.matmul(R, rb.T) + t
 
         vertices:list = [ cp, lt, lb, rt, rb ]
         indices:list = [
@@ -308,6 +368,28 @@ class Renderer3D():
         vertexes['scale'] = scale
         vertexes['translate'] = translate 
 
+    def drawLinestrip(self, ptlist:list, lineColor:list):
+        lc = cpTorgba(lineColor)
+        indices:list = []
+        vertices:list = []
+        barylist=[[1, 0, 0], [0, 1, 0], [0, 0, 1]]
+        i:int = 0
+        for v3 in ptlist :
+            indices.append(i)
+            for pt in v3:
+                vertices.append(pt)
+            vertices.append(lc)
+            vertices.append(1.)
+            vertices.append(1.)
+            vertices.append(1.)
+            vertices.append(lc)
+            i += 1
+        linestrip = {}
+        linestrip['vertices'] = vertices
+        linestrip['indices'] = indices
+        self.linestrip_list.append(linestrip)
+
+
     def setup_gl_context(self, *args):
         glEnable(GL_DEPTH_TEST)
         glDepthFunc(GL_LESS)
@@ -364,7 +446,6 @@ class Renderer3D():
         ##
         # polygon
         ##
-
         vertices=[]
         indices=[]
         for vertexes in self.vertexes_list:
@@ -375,6 +456,16 @@ class Renderer3D():
 
         from kivy.graphics import PushMatrix, PopMatrix
         self.renderer.clear()
+        for linestrip in self.linestrip_list:
+            with self.renderer:
+                self.cb = Callback(self.setup_gl_context)
+                Mesh(
+                    vertices = linestrip['vertices'],
+                    indices = linestrip['indices'],
+                    fmt=self.attr_layout,
+                    mode='line_strip',
+                )
+                self.cb = Callback(self.reset_gl_context)
         with self.renderer:
             PushMatrix()
             self.cb = Callback(self.setup_gl_context)
@@ -386,4 +477,7 @@ class Renderer3D():
                 )
             self.cb = Callback(self.reset_gl_context)
             PopMatrix()
+
         self.vertexes_list.clear()
+        self.linestrip_list.clear()
+
