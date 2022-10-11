@@ -99,7 +99,7 @@ class TemplateTest(Round2Dtemplate):
     def frame(self, delta):
         delta = delta
         super().frame(delta)
-        self.angle += 1
+        self.angle += 0.3
         # self.renderer3d.rotate(self.angle, [1, 0, 0])
         cam_x = 10*math.sin( math.radians(self.angle) )
         cam_y = 10*math.cos( math.radians(self.angle) )
@@ -144,7 +144,7 @@ class TemplateTest(Round2Dtemplate):
         ##
         import numpy as np
         ptlist = []
-        for t in np.arange(0, math.pi*2, math.pi*2/30.) :
+        for t in np.arange(0, math.pi*2, math.pi*2/60.) :
             ptlist.append([math.cos(t), math.sin(t), t/(math.pi*2)])
         self.renderer3d.drawLinestrip(ptlist, [255, 255, 255, 255])
         self.renderer3d.drawCube( [2, 0, 2], [0.5, 0.5, 0.3], [0, 155, 0, 255], [255, 255, 255, 255] )
@@ -155,6 +155,10 @@ class TemplateTest(Round2Dtemplate):
         self.renderer3d.drawCylinder( [2, -3, 0], [0.5, 1], [179, 127, 255, 255], [255, 255, 255, 255])
         self.renderer3d.drawCylinder( [-2, -3, 0], [0.5, 2], [179, 127, 255, 255], [255, 255, 255, 255], [1, 1, 0])
         self.renderer3d.drawSphere( [0, 2, 1], [1, 1], [155, 155, 155, 0], [255, 255, 255, 255])
+
+        self.renderer3d.drawArrow( [3, 0, 0], [0.05, 0.5], [0, 0, 255, 255], [0, 0, 255, 255], [1, 0, 0], 10)
+        self.renderer3d.drawArrow( [3, 0, 0], [0.05, 0.5], [0, 255, 0, 255], [0, 255, 0, 255], [0, 1, 0], 10)
+        self.renderer3d.drawArrow( [3, 0, 0], [0.05, 0.5], [255, 0, 0, 255], [255, 0, 0, 255], [0, 0, 1], 10)
         ##
 
 
