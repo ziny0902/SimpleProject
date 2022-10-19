@@ -1,0 +1,287 @@
+#+title: Round2dtemplate
+* 2D graphic tool
+1. line, circle, polygon을 그리는 방법을 제공.
+2. RGBA 값을 32bit float로 encoding
+3. 둘 이상의 shader program을 사용한다.
+4. 원과 둥근 엣지의 다각형을 그리기 위해 barycentric coordinates 를 사용.
+   [[file:picture/barying system.png][barying coordinate]]
+   [[file:picture/barying system(example).png][barying coordinate example]]
+5. projection matrix는 kivy 라이브러리가 제공하는 것을 사용한다
+6. kivy에서 이용 가능한 default shader input variable은 다음과 같다.
+   #+begin_src glsl
+/* Outputs to the fragment shader */
+varying vec4 frag_color;
+varying vec2 tex_coord0;
+
+/* vertex attributes */
+attribute vec2     vPosition;
+attribute vec2     vTexCoords0;
+
+/* uniform variables */
+uniform mat4       modelview_mat;
+uniform mat4       projection_mat;
+uniform vec4       color;
+uniform float      opacity;
+   #+end_src
+7. shader 코드 상단에 \$HEADER\$ 를 추가하여 이들의 내용을 자신의 shader
+   프로그램에 추가할 수 있다.
+8. Chipmunk Demo 프로그램의 Drawing code를 python으로 porting한 부분이 많다.
+* shader program
+kivy 모든 widget이 window 내에서 하나의 좌표 시스템을 사용하므로 wpz를 이용해
+그리는 대상의 좌표를 widget 내의 상대 좌표로 변화 시켜준다.
+#+begin_src python
+class Round2Dtemplate(Gl2Dcanvas):
+    # from ChipmunkDebugDraw.c
+    vs_src = '''
+    #version 400
+    uniform vec2       iScreen;
+    uniform vec4       iResolution;
+    uniform mat4 projection_mat;
+
+	in vec2 IN_pos;
+	in vec2 IN_uv;
+	in float IN_radius;
+	in float IN_fill;
+	in float IN_outline;
+
+	out struct {
+		vec2 uv;
+		vec4 fill;
+		vec4 outline;
+	} FRAG;
+
+    vec2 get_glcoord(vec2 ipos) {
+        vec2 wpz = iResolution.zw;
+        vec4 pos = projection_mat * vec4(ipos+wpz, 0.0, 1.0);
+        return pos.xy;
+    }
+
+    vec4 EncodeFloatRGBA( float v )
+    {
+        uint rgba = (floatBitsToUint(v));
+        float r = float(rgba >> 24) / 255.0;
+        float g = float((rgba & 0x00ff0000) >> 16) / 255.0;
+        float b = float((rgba & 0x0000ff00) >> 8) / 255.0;
+        float a = float(rgba & 0x000000ff) / 255.0;
+        return vec4(r, g, b, a);
+    }
+
+	void main(){
+		gl_Position = vec4(get_glcoord(IN_pos+IN_radius*IN_uv), 0.0, 1.0);
+		FRAG.uv = IN_uv;
+		FRAG.fill = EncodeFloatRGBA(IN_fill);
+		FRAG.fill.rgb *= FRAG.fill.a;
+		FRAG.outline = EncodeFloatRGBA(IN_outline);
+		//FRAG.outline.a *= IN_outline.a;
+	}
+    '''
+    fs_src = '''
+    #version 400
+	in struct {
+		vec2 uv;
+		vec4 fill;
+		vec4 outline;
+	} FRAG;
+
+	out vec4 OUT_color;
+
+	void main(){
+	    float len = length(FRAG.uv);
+	    float fw = length(fwidth(FRAG.uv));
+	    float mask = smoothstep(-1, fw - 1,  -len);
+
+	    float outline = 1-fw;
+	    float outline_mask = smoothstep(outline - fw, outline, len);
+	    vec4 color = FRAG.fill + (FRAG.outline - FRAG.fill*FRAG.outline.a)*outline_mask;
+	    OUT_color = color*mask;
+	}
+    '''
+#+end_src
+* shader input variable
+#+begin_src python
+    attr_layout = [
+        (b'IN_pos', 2, 'float'),
+        (b'IN_uv', 2, 'float'),
+        (b'IN_radius', 1, 'float'),
+        (b'IN_fill', 1, 'float'),
+        (b'IN_outline', 1, 'float'),
+    ]
+#+end_src
+* Program initialize
+#+begin_src python
+    lineScale = 2.0
+    vertexes_list = []
+    callback_list = {}
+    def __init__(self, **kwargs):
+        super(Round2Dtemplate, self).__init__(vs=self.vs_src, fs=self.fs_src, **kwargs)
+        self.callback_list['display'] = [self.display, self]
+        self.callback_list['frame'] = [self.frame, self]
+        self.textdraw=BasicTextDraw()
+        self.textRender = self.textdraw.RenderContext()
+
+    def fs(self):
+        return self.fs_src
+    def vs(self):
+        return self.vs_src
+    def display(self, instr ):
+        # test data.
+        # pos, angle, r, out, fill
+        self.drawCircle([300, 300], 0, 50, [255, 255, 255, 255], [179, 127, 255, 255])
+        # count, vertices, r, out, fill
+        self.drawPolygon(
+                4,
+                [[500, 100], [500,150], [400, 150], [400, 100]],
+                10.,
+                [255, 255, 255, 255],
+                [179, 127, 255, 255]
+                )
+        self.drawPolygon(
+                5,
+                [[500, 300], [500, 400],  [450, 450], [400,400], [400, 300] ],
+                10.,
+                [255, 255, 255, 255],
+                [179, 127, 255, 255]
+                )
+        # string message, x, y, color
+        self.textdraw.puts("TEST", 100, 100, [230, 226, 114, 255])
+        self.drawFlushRenderer()
+    def frame(self, delta):
+        pass
+#+end_src
+* draw circle
+x와 y의 값은 원의 중심이면 이 좌표의 uv 값이 (0,0)이 된다. 사각형의 각 모서리와
+그 사이에 위치한 모든 픽셀 값은 이 중심으로부터 거리의 값으로 fragment
+shader에게 전달된다. fragment shader는 이 정보를 활용해 원을 그린다.[[https://www.khronos.org/opengl/wiki/Rendering_Pipeline_Overview][wiki: Redering pipeline]]
+[[file:picture/Rendering Pipeline.png][rendering pipeline]]
+#+begin_src python
+    def drawCircle(self, pos, angle, radius, outlineColor, fillColor):
+        fc = cpTorgba(fillColor)
+        oc = cpTorgba(outlineColor)
+        r = float(radius) + self.lineScale
+        x = pos[0]
+        y = pos[1]
+        vertexes = {}
+        vertexes['indices'] = [0, 1, 2, 0, 2, 3]
+        # x, y, u, v, r, fc, oc
+        vertexes['vertices'] = [
+            float(x), float(y), -1., -1., r, fc, oc,
+            float(x), float(y), -1.,  1., r, fc, oc,
+            float(x), float(y),  1.,  1., r, fc, oc,
+            float(x), float(y),  1., -1., r, fc, oc,
+            ]
+        self.vertexes_list.append(vertexes)
+        self.drawSegment(pos, vAdd(pos, vMul(vUnitforangle(angle), 0.75*radius)), outlineColor)
+#+end_src
+* draw polygon
+원과 그리는 방식이 유사하지만 추가적으로 모서리의 정보도 필요하다.
+[[file:picture/shader_drawing_polygon.png][processing polygon]]
+#+begin_src python
+    def drawPolygon(self, count, verts, radius, outlineColor, fillColor):
+        # make a list
+        indexes = [None] * (12 * count + 3*(count - 2))
+        for i in range(0, count - 2):
+            indexes[3*i + 0] = 0
+            indexes[3*i + 1] = 4*(i + 1)
+            indexes[3*i + 2] = 4*(i + 2)
+        start = 3*(count - 2)
+        for i0 in range(0, count):
+            i1 = (i0 + 1)%count
+            indexes[start+12*i0 +  0] = 4*i0 + 0;
+            indexes[start+12*i0 +  1] = 4*i0 + 1;
+            indexes[start+12*i0 +  2] = 4*i0 + 2;
+            indexes[start+12*i0 +  3] = 4*i0 + 0;
+            indexes[start+12*i0 +  4] = 4*i0 + 2;
+            indexes[start+12*i0 +  5] = 4*i0 + 3;
+            indexes[start+12*i0 +  6] = 4*i0 + 0;
+            indexes[start+12*i0 +  7] = 4*i0 + 3;
+            indexes[start+12*i0 +  8] = 4*i1 + 0;
+            indexes[start+12*i0 +  9] = 4*i0 + 3;
+            indexes[start+12*i0 + 10] = 4*i1 + 0;
+            indexes[start+12*i0 + 11] = 4*i1 + 1;
+        inset = float(-max(0, 2*self.lineScale - radius))
+        outset = float(radius) + self.lineScale
+        r = outset - inset
+        vertices = []
+        fc = cpTorgba(fillColor)
+        oc = cpTorgba(outlineColor)
+        for i in range(0, count):
+            v0 = verts[i]
+            v_prev = verts[(i+(count - 1))%count]
+            v_next = verts[(i+(count + 1))%count]
+            n1 = vNomalize(vPerp(vSub(v0, v_prev)))
+            n2 = vNomalize(vPerp(vSub(v_next, v0)))
+            of = vMul(vAdd(n1, n2), 1.0/(vDot(n1, n2)+1.0))
+            v = vAdd(v0, vMul(of, inset))
+            vertices.extend([v[0], v[1], 0.0, 0.0, 0.0,  fc, oc])
+            vertices.extend([v[0], v[1], n1[0], n1[1], r,fc, oc])
+            vertices.extend([v[0], v[1], of[0], of[1], r,fc, oc])
+            vertices.extend([v[0], v[1], n2[0], n2[1], r,fc, oc])
+        vertexes = {}
+        vertexes['indices'] = indexes
+        vertexes['vertices'] = vertices
+        self.vertexes_list.append(vertexes)
+#+end_src
+* draw segment and dot
+#+begin_src python
+    def drawDot(self, size, pos, fillColor):
+        r = size*0.5*self.lineScale
+        fc = cpTorgba(fillColor)
+        vertexes = {}
+        vertexes['indices'] = [0, 1, 2, 0, 2, 3]
+        vertexes['vertices'] = [
+            pos[0], pos[1], -1, -1, r, fc, fc,
+            pos[0], pos[1], -1,  1, r, fc, fc,
+            pos[0], pos[1],  1,  1, r, fc, fc,
+            pos[0], pos[1],  1, -1, r, fc, fc
+            ]
+        self.vertexes_list.append(vertexes)
+
+    def drawFatSegment(self, a, b, radius, outlineColor, fillColor ):
+        r = radius + self.lineScale
+        t = vNomalize(vSub(b, a))
+        fc = cpTorgba(fillColor)
+        oc = cpTorgba(outlineColor)
+        vertexes = {}
+        vertexes['indices'] = [0, 1, 2, 1, 2, 3, 2, 3, 4, 3, 4, 5, 4, 5, 6, 5, 6, 7]
+        vertexes['vertices'] = [
+            float(a[0]), float(a[1]), (-t[0] + t[1]), (-t[0] - t[1]), r, fc, oc,
+            float(a[0]), float(a[1]), (-t[0] - t[1]), (+t[0] - t[1]), r, fc, oc,
+            float(a[0]), float(a[1]), ( -0.0 + t[1]), (-t[0] + 0.0 ), r, fc, oc,
+            float(a[0]), float(a[1]), ( -0.0 - t[1]), (+t[0] + 0.0 ), r, fc, oc,
+            float(b[0]), float(b[1]), ( +0.0 + t[1]), (-t[0] - 0.0 ), r, fc, oc,
+            float(b[0]), float(b[1]), ( +0.0 - t[1]), (+t[0] - 0.0 ), r, fc, oc,
+            float(b[0]), float(b[1]), (+t[0] + t[1]), (-t[0] + t[1]), r, fc, oc,
+            float(b[0]), float(b[1]), (+t[0] - t[1]), (+t[0] + t[1]), r, fc, oc,
+            ]
+        self.vertexes_list.append(vertexes)
+    def drawSegment(self, a, b, color):
+        self.drawFatSegment(a, b, 0., color, color)
+#+end_src
+* transfer data to shader
+모든 도형의 vetices 정보가 하나의 array로 전달 되기 때문에 각 도형의 indices
+정보는 상대적 정보가 된다. 첫 도형을 기준으로 indices 정보를 절대값으로 바꾸어 주어야 한다.
+#+begin_src python
+    def drawFlushRenderer(self):
+        if len(self.vertexes_list) <= 0:
+            return
+        self.canvas.clear();
+        instructions = InstructionGroup()
+        instructions.add(self.textRender)
+        self.canvas.add(instructions)
+        with self.canvas:
+            vertices=[]
+            indices=[]
+            for vertexes in self.vertexes_list:
+                base = int(len(vertices)/7)
+                vertices +=  vertexes['vertices']
+                for i in vertexes['indices']:
+                    indices.append(i+base)
+            Mesh(
+                vertices = vertices,
+                indices= indices,
+                fmt=self.attr_layout,
+                mode='triangles',
+                )
+            self.textdraw.flush(self.textRender)
+        self.vertexes_list.clear()
+#+end_src

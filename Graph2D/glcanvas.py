@@ -6,10 +6,6 @@ from kivy.uix.relativelayout import FloatLayout
 from kivy.graphics import Rectangle
 from kivy.graphics.fbo import Fbo
 
-# test
-# from kivy.lang import Builder
-# Builder.load_file('File.kv')
-
 #class Glcanvas(RelativeLayout):
 from kivymd.uix.relativelayout import MDRelativeLayout 
 class Glcanvas(MDRelativeLayout):

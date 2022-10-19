@@ -3,90 +3,9 @@ from kivy.core.window import Window
 import pandas as pd
 from kivy.graphics import *
 from kivy.properties import ObjectProperty
-from kivy.uix.floatlayout import FloatLayout
+from kivymd.uix.filemanager import MDFileManager
+from kivymd.uix.scrollview import MDScrollView
 
-
-kv_test = """
-<Gl2dGraph>:
-    orientation: 'vertical'
-    MDTopAppBar:
-        title: "Graph2D"
-        right_action_items: 
-            [["file-document-plus", lambda x: root.ids.grah.on_file_select()],
-            ["calculator-variant-outline", lambda x: root.ids.grah.on_mathexpr_select()] ]
-    Graph2d:
-        id:grah
-
-<LoadDialog>:
-    size_hint_y: None 
-    height: "250dp"
-    BoxLayout:
-        size: root.size
-        pos: root.pos
-        orientation: "vertical"
-        FileChooserListView:
-            id: filechooser
-            path: u'./'
-            filters: ['*.csv']
-
-        MDBoxLayout:
-            spacing: "20dp"
-            adaptive_size: True
-            pos_hint: {"center_x": .5, "center_y": .5}
-            MDRoundFlatButton:
-                text: "Cancel"
-                on_release: root.cancel()
-
-            MDRoundFlatButton:
-                text: "Load"
-                on_release: root.load(filechooser.path, filechooser.selection)
-
-<MathEditDialog>:
-    size_hint_y: None
-    height: "220dp"
-    MDBoxLayout:
-        size: root.size
-        pos: root.pos
-        orientation: "vertical"
-        spacing: "10dp"
-        MDTextField:
-            id: math_expr 
-            hint_text: "expression"
-            on_text: root.on_text(self, self.text)
-            on_focus: root.on_focus(self, 0)
-        MDBoxLayout:
-            spacing: "5dp"
-            FloatInput:
-                id: start
-                hint_text: "start"
-                mode: "rectangle"
-                on_focus: root.on_focus(self, 1)
-                on_text: root.on_text(self, self.text)
-            FloatInput:
-                id: end
-                hint_text: "end"
-                mode: "rectangle"
-                on_focus: root.on_focus(self, 2)
-                on_text: root.on_text(self, self.text)
-            FloatInput:
-                id: step
-                hint_text: "num of step"
-                mode: "rectangle"
-                on_focus: root.on_focus(self, 3)
-                on_text: root.on_text(self, self.text)
-
-        MDBoxLayout:
-            spacing: "20dp"
-            adaptive_size: True
-            pos_hint: {"center_x": .5, "center_y": .5}
-            MDFlatButton:
-                text: "Cancel"
-                on_release: root.cancel()
-
-            MDFlatButton:
-                text: "Ok"
-                on_release: root.eval(math_expr.text, start.text, end.text, step.text)
-"""
 
 ##
 # generate test data
@@ -111,54 +30,59 @@ def float2str(v:float) -> str:
     else:
         return f'{v:.0e}'
 
-class LoadDialog(FloatLayout):
-    load = ObjectProperty(None)
-    cancel = ObjectProperty(None)
-
-class MathEditDialog(FloatLayout):
+from kivymd.uix.tab import MDTabsBase
+from custom_common_widget import FloatInput, FocusedTextField
+from kivymd.uix.boxlayout import BoxLayout
+class MathEditDialog(MDScrollView):
     eval = ObjectProperty(None)
     cancel = ObjectProperty(None)
     focus_group: list = []
     next_focus: int = 0
     def __init__(self, **kwargs):
-        from kivy.clock import Clock
         super(MathEditDialog, self).__init__(**kwargs)
-        Clock.schedule_once(self.set_mathexpr_focus, 0.5)
-    def set_mathexpr_focus(self, *args):
-        self.ids.math_expr.focus = True
-        self.next_focus = 1
-        self.focus_group=[self.ids.math_expr, self.ids.start, self.ids.end, self.ids.step]
-    def on_focus(self, instance, value):
-        self.next_focus = (value+1)%4
-        pass
-    def on_text(self, instance, value:str) :
-        c = ' '
-        if len(value) > 0:
-            c = value[len(value) -1]
-        if c == '\t':
-            # instance.focus = False
-            self.focus_group[self.next_focus].focus = True
-            instance.text = value.split("\t")[0]
+        self.ids.function_x.eval = self.eval
+        self.ids.function_x.cancel = self.cancel
+        self.ids.parametric2d.eval = self.eval
+        self.ids.parametric2d.cancel = self.cancel
 
-import re
-from kivymd.uix.textfield.textfield import MDTextField
-class FloatInput(MDTextField):
-    pat:str = re.compile('[^0-9]')
+class Function_x(BoxLayout, MDTabsBase):
+    eval = ObjectProperty(None)
+    cancel = ObjectProperty(None)
+    def fy(self):
+        return self.ids.math_expr.text
+    def xrange(self):
+        return (self.ids.start.text, self.ids.end.text)
+    def step(self):
+        return self.ids.step.text
+    def validate(self) :
+        xs, xe = self.xrange()
+        if(len(self.fy()) == 0 or len(self.step()) == 0
+            or len(xs) == 0 or len(xe) == 0
+            or len(self.step()) == 0
+            ): return False
+        return True
 
-    def insert_text(self, substring, from_undo=False):
-        if substring == "\t":
-            return super().insert_text(substring, from_undo=from_undo)
+class Parametric2d(BoxLayout, MDTabsBase):
+    eval = ObjectProperty(None)
+    cancel = ObjectProperty(None)
+    def fx(self):
+        return self.ids.fx.text
+    def fy(self):
+        return self.ids.fy.text
+    def trange(self):
+        return(float(self.ids.ts.text), float(self.ids.te.text))
+    def step(self):
+        return float(self.ids.step.text)
+    def validate(self):
+        if (
+        len(self.fx()) == 0 or len(self.fy()) == 0
+        or len(self.ids.ts.text) == 0 or len(self.ids.te.text) == 0
+        or len(self.ids.step.text) == 0
+        ): return False
+        return True
 
-        pat = self.pat
-        if '.' in self.text:
-            s = re.sub(pat, '', substring)
-        else:
-            s = '.'.join(
-                re.sub(pat, '', s)
-                for s in substring.split('.', 1)
-            )
-        return super().insert_text(s, from_undo=from_undo)
-
+from custom_common_widget import show_info_message
+from custom_common_widget import FloatInput
 class Graph2d(Round2Dtemplate):
     data: list = []
     x_range: list=[0,0]
@@ -187,58 +111,95 @@ class Graph2d(Round2Dtemplate):
         Window.bind(mouse_pos=self.mouse_pos)
         self.tracker_line = None
         self.tracker_points:list = None
+        import os
+        self.file_manager = MDFileManager(
+            exit_manager=self.exit_manager, select_path=self.select_path,
+            current_path = os.path.expanduser("~"),
+            ext=['.csv']
+        )
+        from kivymd.uix.dialog import MDDialog
+        content = MathEditDialog(eval=self.eval, cancel=self.dismiss_popup)
+        self._popup = MDDialog(title="Edit Math Expression", type="custom", content_cls=content)
+
+    def select_path(self, path: str):
+        self.add_plot_from_file(path)
+        self.exit_manager()
+
+    def exit_manager(self, *args):
+        self.file_manager.close()
 
     def dismiss_popup(self):
         self._popup.dismiss()
 
-    def file_load(self, path:str, filenames:list):
-        self.add_plot_from_file(filenames[0])
-        self.dismiss_popup()
+    def on_new(self):
+        self.data.clear()
+        self.x_axis = [0, 0, 0, 0]
+        self.y_axis = [0, 0, 0, 0]
+        self.view_port = [0,0,0,0]
+        self.pad = [20, 20, 20, 20]
+        self.xtick_str = []
+        self.ytick_str = []
+        self.x_range = [0,0]
+        self.y_range = [0, 0]
+        self.r_x = 0;
+        self.r_y = 0;
+        self.fbo.clear()
+        self.fbo.clear_buffer()
+        self.text_top_right = ""
 
-    def eval(self, expr: str, s:str, e:str, step:str):
+    def eval(self, instance):
+        if instance.validate() is not True:
+            show_info_message("you have to fill fields!")
+            return
+        if instance.title == 'function(x)':
+            self.eval_function_x(instance)
+        if instance.title == 'parametric':
+            self.eval_parameteric(instance)
+
+    def eval_parameteric(self, instance):
+        from sympy import sympify
+        import numpy as np
+        from sympy.abc import t 
+        try:
+            fx = sympify(instance.fx())
+            fy = sympify(instance.fy())
+            ts, te = instance.trange()
+            step = int(instance.step())
+            input = np.linspace(ts, te, step)
+            x:list = []
+            y:list = []
+            for tval in input :
+                x.append(fx.subs(t, tval))
+                y.append(fy.subs(t, tval))
+        except:
+            show_info_message("can't handle expression")
+            return
+        self.dismiss_popup()
+        self.add_plot(x, y)
+
+    def eval_function_x(self, instance):
         from sympy import sympify
         import numpy as np
         from sympy.abc import x
-        from kivymd.uix.snackbar import Snackbar
-        from kivymd.uix.button import MDFlatButton
-        if len(expr) == 0 or len(s) == 0 or len(e) == 0 or len(step) == 0 :
-            snackbar = Snackbar(
-                text="you have to fill fields!",
-                snackbar_x="10dp",
-                snackbar_y="10dp",
-            )
-            snackbar.size_hint_x = (
-                Window.width - (snackbar.snackbar_x * 2)
-            ) / Window.width
-            snackbar.buttons = [
-                MDFlatButton(
-                    text="OK",
-                    text_color=(1, 1, 1, 1),
-                    on_release=snackbar.dismiss,
-                )
-            ]
-            snackbar.open()
+        try:
+            f = sympify(instance.fy())
+            xs, xe = instance.xrange()
+            start:float = float(xs)
+            end:float = float(xe)
+            step = int(instance.step())
+            input = np.linspace(start, end, step)
+            y:list = []
+            for t in input :
+                y.append(f.subs(x, t))
+        except:
+            show_info_message("can't handle expression")
             return
-
-        f = sympify(expr)
-        start:float = float(s)
-        end:float = float(e)
-        input = np.linspace(start, end, int(step))
-        y:list = []
-        for t in input :
-            y.append(f.subs(x, t))
-        self.add_plot(list(input), y)
         self.dismiss_popup()
+        self.add_plot(list(input), y)
     def on_file_select(self):
-        from kivymd.uix.dialog import MDDialog
-        content = LoadDialog(load=self.file_load, cancel=self.dismiss_popup)
-        self._popup = MDDialog(title="Choose csv file", type="custom", content_cls=content)
-        self._popup.open()
+        self.file_manager.show(self.file_manager.current_path)  # output manager to the screen
 
     def on_mathexpr_select(self):
-        from kivymd.uix.dialog import MDDialog
-        content = MathEditDialog(eval=self.eval, cancel=self.dismiss_popup)
-        self._popup = MDDialog(title="Edit Math Expression", type="custom", content_cls=content)
         self._popup.open()
 
     def get_disp_format_string(self, x, y, num:int) -> str:
@@ -278,9 +239,10 @@ class Graph2d(Round2Dtemplate):
         data_str = ""
         i = 0
         for _data in self.data :
-            df = _data.query('index >='+f'{dx:.5f}').iloc[:1]
+            step = (x_range[1] - x_range[0])/_data.index.size
+            df = _data[(_data.index >= dx) & (_data.index < (dx+step))]
             y=0
-            if(len(df) == 1):
+            if(df.index.size >= 1):
                 x = df.index[0]
                 y = df.values[0][0]
                 if(len(data_str) > 0) : data_str += "\n"
@@ -453,7 +415,8 @@ class Graph2d(Round2Dtemplate):
         # display a marker at real data point.
         self.tracker_points = []
         for df in self.data :
-            data = df.query('index >='+f'{dx:.5f}').iloc[:1]
+            step = (x_range[1] - x_range[0])/df.index.size
+            data = df.query('index >='+f'{dx:.5f} and index < '+f'{dx+step:.5f}').iloc[:1]
             if(len(data) == 1):
                 x = viewport[0] + (data.index[0] - self.x_range[0])*self.r_x
                 y = viewport[1] + (data.values[0][0]- self.y_range[0])*self.r_y
@@ -504,20 +467,9 @@ class Graph2d(Round2Dtemplate):
 
     def resize(self, *args):
         super().resize(*args)
+        self._popup.content_cls.height=self.height
+        self._popup.size = self.size
+        self._popup.update_height()
         if( len(self.data) > 0 ):
             self.plot()
 
-from kivy.lang import Builder
-if __name__ == "__main__":
-    Builder.load_string(kv_test)
-    
-    from kivymd.uix.boxlayout import MDBoxLayout
-    class Gl2dGraph(MDBoxLayout):
-        pass
-    # from kivy.app import App
-    from kivymd.app import MDApp
-    class graph2dApp(MDApp):
-        def build(self):
-            self.theme_cls.theme_style = "Dark"
-            return Gl2dGraph()
-    graph2dApp().run()

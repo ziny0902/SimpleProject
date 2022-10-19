@@ -58,12 +58,14 @@ class Round2Dtemplate(Glcanvas):
         self.round2d = Round2DRender()
         self.textdraw=BasicTextDraw()
         self.renderer3d = Renderer3D()
+        self.pov:float = 45.
+        self.far = 100
+        self.near = 0.1
         self.kivy_instructions = InstructionGroup()
 
     def resize(self, *args):
         super().resize(*args)
-        self.pov:float = 60.
-        self.renderer3d.setup_projection(self.pov, self.width, self.height, 0.1, 100)
+        self.renderer3d.setup_projection(self.pov, self.width, self.height, self.near, self.far)
 
     def frame(self, delta):
         super().frame(delta)
@@ -84,6 +86,8 @@ class Round2Dtemplate(Glcanvas):
         instructions.add(self.round2d.renderer)
         instructions.add(self.kivy_instructions)
         instructions.add(self.renderer3d.renderer)
+        #infinite plane
+        instructions.add(self.renderer3d.plane_renderer)
         self.fbo.add(instructions)
 
 class TemplateTest(Round2Dtemplate):
@@ -165,40 +169,38 @@ class TemplateTest(Round2Dtemplate):
         ##
         # 2D Graphics example
         ##
-        # self.round2d.drawCircle([300, 300], 0, 50, [255, 255, 255, 255], [179, 127, 255, 255])
-        # self.round2d.drawPolygon(
-        #         4,
-        #         [[1000, 100], [1000,150], [400, 150], [400, 100]],
-        #         10.,
-        #         [255, 255, 255, 255],
-        #         [179, 127, 255, 255]
-        #         )
-        # self.round2d.drawPolygon(
-        #         5,
-        #         [[500, 300], [500, 400],  [450, 450], [400,400], [400, 300] ],
-        #         5.,
-        #         [255, 255, 255, 255],
-        #         [179, 127, 255, 255]
-        #         )
-        # self.textdraw.puts("TEST", 330, 400, [230, 226, 114, 255])
-        # self.kivy_instructions.clear()
-        # self.kivy_instructions.add(Color(1,0,0))
-        # self.kivy_instructions.add(Rectangle(pos=(100, 480), size=(100, 100)))
-        # self.kivy_instructions.add(Line(points=[100, 200, 200, 200, 100, 300], width=1))
-        # self.kivy_instructions.add(Color(1,1,1))
-        # self.kivy_instructions.add(self.mouse_circle)
+        self.round2d.drawCircle([300, 300], 0, 50, [255, 255, 255, 255], [179, 127, 255, 255])
+        self.round2d.drawPolygon(
+                4,
+                [[1000, 100], [1000,150], [400, 150], [400, 100]],
+                10.,
+                [255, 255, 255, 255],
+                [179, 127, 255, 255]
+                )
+        self.round2d.drawPolygon(
+                5,
+                [[500, 300], [500, 400],  [450, 450], [400,400], [400, 300] ],
+                5.,
+                [255, 255, 255, 255],
+                [179, 127, 255, 255]
+                )
+        self.textdraw.puts("TEST", 330, 400, [230, 226, 114, 255])
+        self.kivy_instructions.clear()
+        self.kivy_instructions.add(Color(1,0,0))
+        self.kivy_instructions.add(Rectangle(pos=(100, 480), size=(100, 100)))
+        self.kivy_instructions.add(Line(points=[100, 200, 200, 200, 100, 300], width=1))
+        self.kivy_instructions.add(Color(1,1,1))
+        self.kivy_instructions.add(self.mouse_circle)
         self.drawFlushRenderer()
 
     def update(self, instr ):
         super().update(instr)
     pass
 if __name__ == "__main__":
-    Builder.load_file('File.kv')
-    class Glview(GridLayout):
-        pass
-    from kivy.app import App
-    class TestApp(App):
+    # from kivy.app import App
+    from kivymd.app import MDApp
+    class TestApp(MDApp):
         def build(self):
-            return Glview()
-            #return Round2Dtemplate()
+            self.theme_cls.theme_style = "Dark"
+            return TemplateTest()
     TestApp().run()

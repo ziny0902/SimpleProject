@@ -62,7 +62,7 @@ class BasicTextDraw():
     	(b'IN_uv', 2, 'float'),
     	(b'IN_color', 1, 'float'),
 	]
-	def __init__(self, font='Ubuntu Mono Nerd Font Complete Mono.ttf', size=24):
+	def __init__(self, font='font/Ubuntu Mono Nerd Font Complete Mono.ttf', size=24):
 		self.face = None
 		self.bitmap = None
 		self.cursor_x = 0.

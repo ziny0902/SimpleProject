@@ -23,6 +23,14 @@ def cpTorgb(c):
     a = a | ( c[2]  )
     #print(a.to_bytes(4, 'big'))
     return a
+def rgbTocp(rgb):
+    cp=[]
+    cp.append( float(0xff & ( rgb >> 16))/255. )
+    cp.append( float(0xff & ( rgb >> 8))/255. )
+    cp.append( float(0xff & rgb)/255. )
+    cp.append( 1)
+    cp.append( 1.)
+    return cp
 
 def vDot(v1, v2):
     return v1[0]*v2[0] + v1[1]*v2[1]

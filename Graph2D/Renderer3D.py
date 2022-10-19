@@ -2,8 +2,8 @@
 from kivy.graphics import Mesh, RenderContext, Callback
 from kivy.graphics.opengl import  glEnable, glDisable, glDepthFunc, glCullFace, glFrontFace,\
                                 GL_LESS, GL_DEPTH_TEST, GL_CULL_FACE, GL_BACK, GL_CCW
-from kivy.graphics.opengl import glBlendFunc, GL_ONE, GL_ONE_MINUS_SRC_ALPHA,\
-                                GL_SRC_ALPHA
+# from kivy.graphics.opengl import glBlendFunc, GL_ONE, GL_ONE_MINUS_SRC_ALPHA,\
+#                                 GL_SRC_ALPHA
 from util import *
 import math
 import numpy as np
@@ -61,6 +61,101 @@ class Renderer3D():
         OUT_color = color;
 	}
     '''
+    plane_vs = '''
+    #version 410
+    #extension GL_KHR_vulkan_glsl : enable
+    uniform mat4 projection_mat;
+    uniform mat4 modelview_mat;
+    uniform mat4 lookat;
+	in vec3 IN_pos;
+    layout (location=0) out vec2 uv;
+    void main() {
+        vec3 pos = IN_pos * 100.;
+        pos.y = -1.;
+        gl_Position = projection_mat * lookat * modelview_mat * vec4(pos, 1.0);
+        uv = pos.xz;
+    }
+    '''
+    plane_fs = '''
+    #version 410
+    layout (location=0) in vec2 uv;
+    out vec4 outColor;
+    // extents of grid in world coordinates
+    float gridSize = 100.0;
+
+    // size of one cell
+    float gridCellSize = 0.05;
+
+    // color of thin lines
+    vec4 gridColorThin = vec4(0.5, 0.5, 0.5, 0.6);
+
+    // color of thick lines (every tenth line)
+    vec4 gridColorThick = vec4(1.0, 1.0, 1.0, 0.8);
+
+    // minimum number of pixels between cell lines before LOD switch should occur. 
+    const float gridMinPixelsBetweenCells = 4.0;
+    float log10(float x)
+    {
+	    return log(x) / log(10.0);
+    }
+
+    float satf(float x)
+    {
+	    return clamp(x, 0.0, 1.0);
+    }
+
+    vec2 satv(vec2 x)
+    {
+	    return clamp(x, vec2(0.0), vec2(1.0));
+    }
+
+    float max2(vec2 v)
+    {
+	    return max(v.x, v.y);
+    }
+
+    vec4 gridColor(vec2 uv)
+    {
+	    vec2 dudv = vec2(
+		    length(vec2(dFdx(uv.x), dFdy(uv.x))),
+		    length(vec2(dFdx(uv.y), dFdy(uv.y)))
+	    );
+
+	    // LOD : level of detail
+
+	    float lodLevel = max(0.0, log10((length(dudv) * gridMinPixelsBetweenCells) / gridCellSize) + 1.0);
+	    float lodFade = fract(lodLevel);
+
+	    // cell sizes for lod0, lod1 and lod2
+	    float lod0 = gridCellSize * pow(10.0, floor(lodLevel));
+	    float lod1 = lod0 * 10.0;
+	    float lod2 = lod1 * 10.0;
+
+	    // each anti-aliased line covers up to 4 pixels
+	    dudv *= 4.0;
+
+	    // calculate absolute distances to cell line centers for each lod and pick max X/Y to get coverage alpha value
+	    float lod0a = max2( vec2(1.0) - abs(satv(mod(uv, lod0) / dudv) * 2.0 - vec2(1.0)) );
+	    float lod1a = max2( vec2(1.0) - abs(satv(mod(uv, lod1) / dudv) * 2.0 - vec2(1.0)) );
+	    float lod2a = max2( vec2(1.0) - abs(satv(mod(uv, lod2) / dudv) * 2.0 - vec2(1.0)) );
+
+	    // blend between falloff colors to handle LOD transition
+	    vec4 c = lod2a > 0.0 ? gridColorThick : lod1a > 0.0 ? mix(gridColorThick, gridColorThin, lodFade) : gridColorThin;
+	    if( abs(uv.y) <= dudv.y && lod2a > 0.0) c = vec4(24./255, 156./255, 1.0, 1.0);
+	    if( abs(uv.x) <= dudv.x  && lod2a > 0.0) c = vec4(1.0, 3./255, 3./255, 1.0);
+
+	    // calculate opacity falloff based on distance to grid extents
+	    float opacityFalloff = (1.0 - satf(length(uv) / gridSize));
+
+	    // blend between LOD level alphas and scale with opacity falloff
+	    c.a *= (lod2a > 0.0 ? lod2a : lod1a > 0.0 ? lod1a : (lod0a * (1.0-lodFade))) * opacityFalloff;
+
+	    return c;
+    }
+    void main() {
+        outColor =  gridColor(uv);
+    }
+    '''
     attr_layout = [
         (b'IN_pos', 3, 'float'),
         (b'IN_color', 1, 'float'),
@@ -73,9 +168,15 @@ class Renderer3D():
         self.renderer = RenderContext(compute_normal_mat=True)
         self.renderer.shader.vs = self.vs_src
         self.renderer.shader.fs = self.fs_src
+        self.plane_renderer = RenderContext()
+        self.plane_renderer.shader.vs = self.plane_vs
+        self.plane_renderer.shader.fs = self.plane_fs
         self.setup_camera([0, 0, 2], [0, 0, 0], [0, 1, 0])
         self.setup_projection(60, 680, 480, 0.1, 100)
         self.modelview_mat = Matrix()
+        self.option = {
+                "grid": True,
+                }
 
 
     ##
@@ -212,9 +313,9 @@ class Renderer3D():
                     p3,
                     fillColor,
                     lineColor, size, t)
-        self.drawCone(tcp, [size[0]*2, size[0]*2], fillColor, lineColor, dir, 10)
+        self.drawCone(tcp, [size[0]*4, size[0]*6], fillColor, lineColor, dir, 10)
 
-    def drawSphere(self, center, size, fillColor, lineColor, density:int = 40):
+    def drawSphere(self, center, size, fillColor, lineColor, density:int = 20):
         t = np.array(center)
         unit_step = math.pi/density
         #
@@ -288,14 +389,6 @@ class Renderer3D():
                 Etag.lb.value, Etag.rt.value, Etag.lt.value,
                 Etag.lb.value, Etag.rb.value, Etag.rt.value,
                 ]
-        colorlist = [
-                [155, 0, 0, 255],
-                [0, 155, 0, 255],
-                [0, 0, 155, 255],
-                [50, 50, 50, 255],
-                [155, 155, 155, 255],
-                [155, 155, 155, 255],
-                ]
         length = len(indices)
         for i in range(0, length, 3):
             self.drawTriangle( 
@@ -303,7 +396,6 @@ class Renderer3D():
                     vertices[ indices[i+1] ],
                     vertices[ indices[i+2] ],
                     fillColor,
-                    # colorlist[int(i/3)],
                     lineColor, size, t)
 
     ##
@@ -416,28 +508,21 @@ class Renderer3D():
         linestrip['vertices'] = vertices
         linestrip['indices'] = indices
         self.linestrip_list.append(linestrip)
-        # length = len(ptlist)
-        # for i in range(0, length-1):
-        #     p1 = ptlist[i]
-        #     p2 = ptlist[i+1]
-        #     dir = np.array(p2) - np.array(p1)
-        #     norm = np.linalg.norm(dir)
-        #     self.drawCylinder( p2, [0.01, norm], lineColor, lineColor, dir, 4)
 
 
     def setup_gl_context(self, *args):
         glEnable(GL_DEPTH_TEST)
         glDepthFunc(GL_LESS)
-        glEnable(GL_CULL_FACE)
-        glCullFace(GL_BACK)
-        glFrontFace(GL_CCW)
+        # glEnable(GL_CULL_FACE)
+        # glCullFace(GL_BACK)
+        # glFrontFace(GL_CCW)
         # need for proper rendering
         # glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
         pass
 
     def reset_gl_context(self, *args):
         glDisable(GL_DEPTH_TEST)
-        glDisable(GL_CULL_FACE)
+        # glDisable(GL_CULL_FACE)
         # kivy default blend function value
         # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
         pass
@@ -447,37 +532,56 @@ class Renderer3D():
     def setup_camera(self, c:list, t:list, up:list):
         lookat = Matrix().look_at(c[0], c[1], c[2], t[0], t[1], t[2],  up[0], up[1], up[2])
         self.renderer['lookat'] = lookat
+        self.plane_renderer['lookat'] = lookat
 
     def setup_projection(self, pov:float, width, height, rear:float, far:float):
         asp = width / float(height)
         perspective = Matrix()
         perspective.perspective(pov, asp, rear, far)
         self.renderer['projection_mat'] = perspective
+        self.plane_renderer['projection_mat'] = perspective
 
     ##
     # angle : degree
     ##
-    def rotate(self, angle:float, axis:list):
-        self.renderer["modelview_mat"]=Matrix().rotate(math.radians(angle), axis[0], axis[1], axis[2])
-    def rotate_x(self, angle:float ):
-        self.modelview_mat.rotate((2*angle*math.pi)/360, 1, 0, 0)
-        self.renderer["modelview_mat"]=self.modelview_mat
-    def rotate_y(self, angle:float ):
-        self.modelview_mat.rotate((2*angle*math.pi)/360, 0, 1, 0)
-        self.renderer["modelview_mat"]=self.modelview_mat
-    def rotate_z(self, angle:float ):
-        self.modelview_mat.rotate((2*angle*math.pi)/360, 0, 0, 1)
-        self.renderer["modelview_mat"]=self.modelview_mat
+    from multipledispatch import dispatch
+    @dispatch(list)
+    def rotate(self, angle:list):
+        m = Matrix()
+        m.rotate(math.radians(angle[0]), 1, 0, 0)
+        m.rotate(math.radians(angle[1]), 0, 1, 0)
+        m.rotate(math.radians(angle[2]), 0, 0, 1)
+        self.renderer["modelview_mat"]=m
+    @dispatch(float, list)
+    def rotate(self, angle:float, axies:list):
+        m = self.modelview_mat.rotate(math.radians(angle), axies[0], axies[1], axies[3])
+        self.renderer["modelview_mat"] = m
+
     def translate(self, x:float, y:float, z:float):
         self.modelview_mat.translate(x, y, z)
         self.renderer["modelview_mat"]=self.modelview_mat
 
+    def scale(self, x:float, y:float, z:float):
+        m = self.modelview_mat.scale(x, y, z)
+        self.renderer["modelview_mat"] = m
+    def reset_modelview(self):
+        self.modelview_mat = Matrix()
+
     def flush(self):
-        from kivy.graphics import PushMatrix, PopMatrix
-        from kivy.graphics.context_instructions import Scale , Translate
         self.renderer.clear()
-        if len(self.vertexes_list) <= 0:
+        if len(self.vertexes_list) <= 0 and len(self.linestrip_list) <= 0:
             return
+
+        # infinite grid
+        self.plane_renderer.clear()
+        if self.option["grid"] :
+            with self.plane_renderer:
+                Mesh(
+                    vertices = [1., 0., 1., -1., 0., -1., -1., 0., 1., -1., 0., -1., 1., 0., 1., 1., 0., -1.  ],
+                    indices = [0, 1, 2, 3, 4, 5],
+                    fmt=[ (b'IN_pos', 3, 'float') ],
+                    mode='triangles',
+                    )
         ##
         # polygon
         ##
@@ -489,7 +593,6 @@ class Renderer3D():
             for i in vertexes['indices']:
                 indices.append(i+base)
 
-        from kivy.graphics import PushMatrix, PopMatrix
         self.renderer.clear()
         for linestrip in self.linestrip_list:
             with self.renderer:
@@ -502,7 +605,6 @@ class Renderer3D():
                 )
                 self.cb = Callback(self.reset_gl_context)
         with self.renderer:
-            PushMatrix()
             self.cb = Callback(self.setup_gl_context)
             Mesh(
                 vertices = vertices,
@@ -511,7 +613,6 @@ class Renderer3D():
                 mode='triangles',
                 )
             self.cb = Callback(self.reset_gl_context)
-            PopMatrix()
 
         self.vertexes_list.clear()
         self.linestrip_list.clear()
