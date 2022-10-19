@@ -25,28 +25,28 @@ class Round2Dtemplate(Glcanvas):
         pos_hint: {'center_x': .5, 'center_y': .5}
         cols:2
         rows:2
-        Label:
+        MDLabel:
             text: glCanvas.text_top_left #"Top left"
             text_size: self.width-10, self.height - 10
             valign: 'top'
-            font_size: '15sp'
-        Label:
+            font_size: '20sp'
+        MDLabel:
             text: glCanvas.text_top_right
             text_size: self.width-10, self.height - 10
             valign: 'top'
             halign: 'right'
-            font_size: '15sp'
-        Label:
+            font_size: '20sp'
+        MDLabel:
             text: glCanvas.text_bottom_left
             text_size: self.width-10, self.height - 10
             valign: 'bottom'
-            font_size: '15sp'
-        Label:
+            font_size: '20sp'
+        MDLabel:
             text: glCanvas.text_bottom_right
             text_size: self.width-10, self.height-10
             valign: 'bottom'
             halign: 'right'
-            font_size: '15sp'
+            font_size: '20sp'
 '''
     )
     text_top_left = StringProperty('')

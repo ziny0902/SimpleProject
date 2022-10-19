@@ -129,10 +129,12 @@ MDScreen:
         MDFlatButton:
             text: "Cancel"
             on_press: root.cancel()
+            font_size: '20sp'
 
         MDFlatButton:
             text: "Ok"
             on_press: root.eval(root)
+            font_size: '20sp'
 <Function_x>:
     title: "function(x)"
     orientation: "vertical"
@@ -163,10 +165,12 @@ MDScreen:
         MDFlatButton:
             text: "Cancel"
             on_press: root.cancel()
+            font_size: '20sp'
 
         MDFlatButton:
             text: "Ok"
             on_press: root.eval(root)
+            font_size: '20sp'
     """
     class GraphManager(MDScreenManager):
         def current_graph(self, root):
@@ -200,11 +204,21 @@ MDScreen:
             LabelBase.register(
                 name="KoPubWorld",
                 fn_regular="font/KoPubWorld Dotum Medium.ttf")
+            LabelBase.register(
+                name="Mono",
+                fn_regular="font/Ubuntu Mono Nerd Font Complete Mono.ttf")
 
             theme_font_styles.append('KoPubWorld')
+            theme_font_styles.append('Mono')
             self.theme_cls.font_styles["Subtitle1"] = [
                 "KoPubWorld",
-                16,
+                18,
+                False,
+                0.15,
+            ]
+            self.theme_cls.font_styles["Body1"] = [
+                "Mono",
+                18,
                 False,
                 0.15,
             ]

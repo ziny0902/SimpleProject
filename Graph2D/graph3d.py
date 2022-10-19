@@ -1,6 +1,7 @@
 from kivy.graphics import Color, Ellipse, Rectangle, Line
 from kivy.uix.floatlayout import FloatLayout
 from kivymd.uix.boxlayout import BoxLayout
+from kivymd.uix.dialog import MDDialog
 from kivymd.uix.label import MDIcon
 from kivymd.uix.scrollview import MDScrollView
 from Round2Dtemplate import Round2Dtemplate
@@ -340,10 +341,12 @@ class Graph3d(Round2Dtemplate):
         MDFlatButton:
             text: "Cancel"
             on_press: root.dismiss()
+            font_size: '20sp'
 
         MDFlatButton:
             text: "Ok"
             on_press: root.eval(root)
+            font_size: '20sp'
 <Parametric3dmesh>:
     title: 'parametric'
     orientation: "vertical"
@@ -417,10 +420,12 @@ class Graph3d(Round2Dtemplate):
         MDFlatButton:
             text: "Cancel"
             on_press: root.dismiss()
+            font_size: '20sp'
 
         MDFlatButton:
             text: "Ok"
             on_press: root.eval(root)
+            font_size: '20sp'
 
 <Function_xy>:
     title: 'function(x,y)'
@@ -487,10 +492,12 @@ class Graph3d(Round2Dtemplate):
         MDFlatButton:
             text: "Cancel"
             on_press: root.dismiss()
+            font_size: '20sp'
 
         MDFlatButton:
             text: "Ok"
             on_press: root.eval(root)
+            font_size: '20sp'
     '''
     )
     class LineColors():
@@ -700,40 +707,47 @@ class Graph3d(Round2Dtemplate):
                 f'max: [{max_list[0]:.1f}, {max_list[2]:.1f}, {max_list[1]:.1f}]\n' 
                 + f'min: [{min_list[0]:.1f}, {min_list[2]:.1f}, {min_list[1]:.1f}]')
 from custom_common_widget import show_info_message
+from kivy.clock import Clock
+from kivymd.uix.progressbar import MDProgressBar
+import threading
 class Graph3dline(Graph3d):
     def __init__(self, **kwargs):
         super(Graph3dline, self).__init__(**kwargs)
-        from kivymd.uix.dialog import MDDialog
         content = Graph3dlineMathEditor(eval=self.on_eval, dismiss=self.on_dismiss)
         self.math_editor = MDDialog(title="Expression Dialog", 
                 type="custom",
                 content_cls=content,
                 size_hint=(None, None)
                 )
+        progressbar = MDProgressBar(type="determinate", size_hint_y=None, height=100)
+        self.progressbar = MDDialog(title="Calculating", 
+                type="custom",
+                content_cls=progressbar,
+                )
     def eval_parametric(self, instance):
         from sympy import sympify
         from sympy.abc import t
-        fx = sympify(instance.x_expr())
-        fy = sympify(instance.y_expr())
-        fz = sympify(instance.z_expr())
-        ts, te = instance.t()
-        numofstep = instance.step()
+        try:
+            fx = sympify(instance.x_expr())
+            fy = sympify(instance.y_expr())
+            fz = sympify(instance.z_expr())
+            ts, te = instance.t()
+            numofstep = instance.step()
 
-        ts = float(ts)
-        te = float(te)
+            ts = float(ts)
+            te = float(te)
+        except:
+            show_info_message("can't handle expression")
+            return
+        self.on_dismiss()
         step = (te - ts)/float(numofstep)
         xval = []
         yval = []
         zval = []
-        try:
-            for tval in np.arange(ts, te, step):
-                xval.append(fx.subs(t, tval))
-                yval.append(fy.subs(t, tval))
-                zval.append(fz.subs(t, tval))
-        except:
-            show_info_message("can't handle expression")
-            return False
-        self.on_dismiss()
+        for tval in np.arange(ts, te, step):
+            xval.append(fx.subs(t, tval))
+            yval.append(fy.subs(t, tval))
+            zval.append(fz.subs(t, tval))
         dict = {
                 "x": list(xval),
                 "y": list(yval),
@@ -741,15 +755,21 @@ class Graph3dline(Graph3d):
                 }
         self.data = pd.DataFrame(dict)
         self.data = self.data.set_index("x")
+        Clock.schedule_once(self.update_graph)
+    def update_graph(self, dt):
         self.adjust_coordinate(self.data)
         self.setup_scene()
-        return True
+        self.progressbar.dismiss()
     def on_eval(self, instance):
         if instance.validate() is not True : 
             show_info_message("you have to fill fields!")
             return
         self.on_new()
         if instance.title == 'parametric':
+            self.loading = threading.Thread(target=self.eval_parametric, args=(instance,))
+            self.loading.start()
+            self.progressbar.open()
+            self.progressbar.content_cls.start()
             self.eval_parametric(instance)
     def on_dismiss(self):
         self.math_editor.dismiss()
@@ -796,12 +816,16 @@ class Graph3dline(Graph3d):
 class Graph3dmesh(Graph3d):
     def __init__(self, **kwargs):
         super(Graph3dmesh, self).__init__(**kwargs)
-        from kivymd.uix.dialog import MDDialog
         content = Graph3dmeshMathEditor(eval=self.on_eval, dismiss=self.on_dismiss)
         self.math_editor = MDDialog(title="Expression Dialog", 
                 type="custom",
                 content_cls=content,
                 size_hint=(None, None)
+                )
+        progressbar = MDProgressBar(type="determinate", size_hint_y=None, height=100)
+        self.progressbar = MDDialog(title="Calculating", 
+                type="custom",
+                content_cls=progressbar,
                 )
 
     def on_mathexpr_select(self):
@@ -813,53 +837,60 @@ class Graph3dmesh(Graph3d):
             return
         self.on_new()
         if instance.title == "function(x,y)":
-            self.eval_func_xy(instance)
+            self.loading = threading.Thread(target=self.eval_func_xy, args=(instance,))
+            self.loading.start()
+            self.progressbar.open()
+            self.progressbar.content_cls.start()
             return
         if instance.title == "parametric":
-            self.eval_parametric(instance)
+            self.loading = threading.Thread(target=self.eval_parametric, args=(instance,))
+            self.loading.start()
+            self.progressbar.open()
+            self.progressbar.content_cls.start()
             return
+
     def eval_parametric(self, instance):
         from sympy import sympify
-        from sympy.abc import u, v
-        fx = sympify(instance.fx())
-        fy = sympify(instance.fy())
-        fz = sympify(instance.fz())
-        us, ue = instance.urange()
-        vs, ve = instance.vrange()
-        numofustep = instance.ustep()
-        numofvstep = instance.vstep()
-
-        us = float(us)
-        ue = float(ue)
-        vs = float(vs)
-        ve = float(ve)
-        ustep = (ue - us)/float(numofustep)
-        vstep = (ve - vs)/float(numofvstep)
-        xval = []
-        yval = []
-        zval = []
         try:
-            for uval in np.arange(us, ue, ustep):
-                for vval in np.arange(vs, ve, vstep):
-                    xval.append(fx.subs([(u, uval), (v, vval)]))
-                    yval.append(fy.subs([(u, uval), (v, vval)]))
-                    zval.append(fz.subs([(u, uval), (v, vval)]))
+            fx = sympify(instance.fx())
+            fy = sympify(instance.fy())
+            fz = sympify(instance.fz())
+            us, ue = instance.urange()
+            vs, ve = instance.vrange()
+            numofustep = instance.ustep()
+            numofvstep = instance.vstep()
 
-                    xval.append(fx.subs([(u, uval+ustep), (v, vval)]))
-                    yval.append(fy.subs([(u, uval+ustep), (v, vval)]))
-                    zval.append(fz.subs([(u, uval+ustep), (v, vval)]))
-
-                    xval.append(fx.subs([(u, uval+ustep), (v, vval+vstep)]))
-                    yval.append(fy.subs([(u, uval+ustep), (v, vval+vstep)]))
-                    zval.append(fz.subs([(u, uval+ustep), (v, vval+vstep)]))
-
-                    xval.append(fx.subs([(u, uval), (v, vval+vstep)]))
-                    yval.append(fy.subs([(u, uval), (v, vval+vstep)]))
-                    zval.append(fz.subs([(u, uval), (v, vval+vstep)]))
+            us = float(us)
+            ue = float(ue)
+            vs = float(vs)
+            ve = float(ve)
+            ustep = (ue - us)/float(numofustep)
+            vstep = (ve - vs)/float(numofvstep)
         except:
             show_info_message("can't handle expression")
             return False
         self.on_dismiss()
+        from sympy.abc import u, v
+        xval = []
+        yval = []
+        zval = []
+        for uval in np.arange(us, ue, ustep):
+            for vval in np.arange(vs, ve, vstep):
+                xval.append(fx.subs([(u, uval), (v, vval)]))
+                yval.append(fy.subs([(u, uval), (v, vval)]))
+                zval.append(fz.subs([(u, uval), (v, vval)]))
+
+                xval.append(fx.subs([(u, uval+ustep), (v, vval)]))
+                yval.append(fy.subs([(u, uval+ustep), (v, vval)]))
+                zval.append(fz.subs([(u, uval+ustep), (v, vval)]))
+
+                xval.append(fx.subs([(u, uval+ustep), (v, vval+vstep)]))
+                yval.append(fy.subs([(u, uval+ustep), (v, vval+vstep)]))
+                zval.append(fz.subs([(u, uval+ustep), (v, vval+vstep)]))
+
+                xval.append(fx.subs([(u, uval), (v, vval+vstep)]))
+                yval.append(fy.subs([(u, uval), (v, vval+vstep)]))
+                zval.append(fz.subs([(u, uval), (v, vval+vstep)]))
         dict = {
                 "x": list(xval),
                 "y": list(yval),
@@ -867,9 +898,12 @@ class Graph3dmesh(Graph3d):
                 }
         self.data = pd.DataFrame(dict)
         self.data = self.data.set_index("x")
+        Clock.schedule_once(self.update_graph)
+    def update_graph(self, dt):
         self.adjust_coordinate(self.data)
         self.setup_scene()
-        return True
+        self.progressbar.dismiss()
+
     def eval_func_xy(self, instance):
         from sympy import sympify
         from sympy.abc import x, y
@@ -888,36 +922,35 @@ class Graph3dmesh(Graph3d):
             ye = float(ye)
             xstep = (xe - xs)/float(numofx)
             ystep = (ye - ys)/float(numofy)
-            fval = []
-            xval = []
-            yval = []
-            for a in np.arange(xs, xe, xstep):
-                for b in np.arange(ys, ye, ystep):
-                    xval.append(a)
-                    yval.append(b)
-                    fval.append(f.subs([ (x, a), (y, b) ]))
-                    xval.append(a + xstep)
-                    yval.append(b )
-                    fval.append(f.subs([ (x, a+xstep), (y, b) ]))
-                    xval.append(a + xstep)
-                    yval.append(b + ystep)
-                    fval.append(f.subs([ (x, a+xstep), (y, b+ystep) ]))
-                    xval.append(a)
-                    yval.append(b + ystep)
-                    fval.append(f.subs([ (x, a), (y, b + ystep) ]))
-            dict = {
-                    "x": list(xval),
-                    "y": list(yval),
-                    "z": fval
-                    }
-            self.data = pd.DataFrame(dict)
         except:
             show_info_message("can't handle expression")
             return False
         self.on_dismiss()
+        fval = []
+        xval = []
+        yval = []
+        for a in np.arange(xs, xe, xstep):
+            for b in np.arange(ys, ye, ystep):
+                xval.append(a)
+                yval.append(b)
+                fval.append(f.subs([ (x, a), (y, b) ]))
+                xval.append(a + xstep)
+                yval.append(b )
+                fval.append(f.subs([ (x, a+xstep), (y, b) ]))
+                xval.append(a + xstep)
+                yval.append(b + ystep)
+                fval.append(f.subs([ (x, a+xstep), (y, b+ystep) ]))
+                xval.append(a)
+                yval.append(b + ystep)
+                fval.append(f.subs([ (x, a), (y, b + ystep) ]))
+        dict = {
+                "x": list(xval),
+                "y": list(yval),
+                "z": fval
+                }
+        self.data = pd.DataFrame(dict)
         self.data = self.data.set_index("x")
-        self.adjust_coordinate(self.data)
-        self.setup_scene()
+        Clock.schedule_once(self.update_graph)
         return True
 
     def on_dismiss(self):
