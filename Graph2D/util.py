@@ -58,6 +58,13 @@ def vMul(a, b):
 def vUnitforangle(angle):
     return [math.cos(angle), math.sin(angle)]
 
+def square_distance(a, b):
+    xd = (a[0] - b[0])*(a[0] - b[0])
+    yd = (a[1] - b[1])*(a[1] - b[1])
+    zd = (a[2] - b[2])*(a[2] - b[2])
+    return xd+yd+zd
+
+
 def vNomalize(t):
     v = [0]*2
     len = math.sqrt(t[0]*t[0] + t[1]*t[1])

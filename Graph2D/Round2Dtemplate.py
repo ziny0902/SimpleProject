@@ -58,6 +58,7 @@ class Round2Dtemplate(Glcanvas):
         self.round2d = Round2DRender()
         self.textdraw=BasicTextDraw()
         self.renderer3d = Renderer3D()
+        self.debug_renderer = Renderer3D()
         self.pov:float = 45.
         self.far = 100
         self.near = 0.1
@@ -66,6 +67,7 @@ class Round2Dtemplate(Glcanvas):
     def resize(self, *args):
         super().resize(*args)
         self.renderer3d.setup_projection(self.pov, self.width, self.height, self.near, self.far)
+        self.debug_renderer.setup_projection(self.pov, self.width, self.height, self.near, self.far)
 
     def frame(self, delta):
         super().frame(delta)
@@ -81,11 +83,13 @@ class Round2Dtemplate(Glcanvas):
         self.textdraw.flush()
         self.round2d.flush()
         self.renderer3d.flush()
+        self.debug_renderer.flush()
         instructions = InstructionGroup()
         instructions.add(self.textdraw.renderer)
         instructions.add(self.round2d.renderer)
         instructions.add(self.kivy_instructions)
         instructions.add(self.renderer3d.renderer)
+        instructions.add(self.debug_renderer.renderer)
         #infinite plane
         instructions.add(self.renderer3d.plane_renderer)
         self.fbo.add(instructions)

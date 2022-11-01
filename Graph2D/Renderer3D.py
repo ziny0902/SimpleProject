@@ -162,9 +162,11 @@ class Renderer3D():
         (b'IN_barycentric', 3, 'float'),
         (b'IN_lineColor', 1, 'float'),
     ]
+
     def __init__(self, **kwargs):
         self.vertexes_list:list = []
         self.linestrip_list:list = []
+        self.layer:list = []
         self.renderer = RenderContext(compute_normal_mat=True)
         self.renderer.shader.vs = self.vs_src
         self.renderer.shader.fs = self.fs_src
@@ -176,8 +178,8 @@ class Renderer3D():
         self.modelview_mat = Matrix()
         self.option = {
                 "grid": True,
+                "depth_test": True
                 }
-
 
     ##
     # size : R, height
@@ -398,6 +400,76 @@ class Renderer3D():
                     fillColor,
                     lineColor, size, t)
 
+    def drawCubeOutline(self, center, size, lineColor):
+        class Etag(Enum):
+            f_lb = 0
+            f_lt = auto()
+            f_rt = auto()
+            f_rb = auto()
+            b_lb = auto()
+            b_lt = auto()
+            b_rt = auto()
+            b_rb = auto()
+        
+        # translate vector
+        t= np.array(center)
+        half = np.array(size)*0.5
+        #front left bottom #0
+        f_lb= np.array([-1, -1, -1 ])*half + t
+        #front left top #1
+        f_lt= np.array([-1, 1, -1 ])*half + t
+        #front right top #2
+        f_rt= np.array([1, 1, -1 ])*half + t 
+        #front right bottom #3 
+        f_rb= np.array([1, -1, -1 ])*half + t 
+        #back left bottom #4
+        b_lb= np.array([-1, -1, 1 ])*half + t 
+        #front left top #5
+        b_lt= np.array([-1, 1, 1 ])*half + t 
+        #front right top #6
+        b_rt= np.array([1, 1, 1 ])*half + t 
+        #front right bottom #7 
+        b_rb= np.array([1, -1, 1 ])*half + t 
+        indices=[ 
+            # front
+          Etag.f_lb.value, Etag.f_lt.value, Etag.f_rt.value,
+          Etag.f_rb.value, Etag.f_lb.value,
+          # back
+          Etag.b_lb.value, Etag.b_lt.value, Etag.b_rt.value,
+          Etag.b_rb.value, Etag.b_lb.value,
+          
+          #side R
+          Etag.f_rb.value, Etag.f_rt.value, Etag.b_rt.value,
+          Etag.b_rb.value, Etag.f_rb.value,
+
+          #side L
+          Etag.f_lb.value, Etag.b_lb.value, Etag.b_lt.value,
+          Etag.f_lt.value, Etag.f_lb.value,
+
+          # top
+          Etag.f_lt.value, Etag.b_lt.value, Etag.b_rt.value,
+          Etag.f_rt.value, Etag.f_lt.value,
+
+          #bottom
+          Etag.f_lb.value, Etag.b_lb.value, Etag.b_rb.value,
+          Etag.f_rb.value, Etag.f_lb.value
+        ] 
+        vertices:list =[
+            f_lb,
+            f_lt,
+            f_rt,
+            f_rb,
+            b_lb,
+            b_lt,
+            b_rt,
+            b_rb,
+        ]
+        length = len(indices)
+        for i in range(0, length, 5):
+            pt = []
+            for j in range(0, 5):
+                pt.append( list(vertices[ indices[i+j] ]) )
+            self.drawLinestrip(pt, lineColor)
     ##
     # size: width, height, depth
     ##
@@ -414,22 +486,23 @@ class Renderer3D():
         
         # translate vector
         t= np.array(center)
+        half = np.array(size)*0.5
         #front left bottom #0
-        f_lb= np.array([-1, -1, -1 ])*size + t
+        f_lb= np.array([-1, -1, -1 ])*half + t
         #front left top #1
-        f_lt= np.array([-1, 1, -1 ])*size + t
+        f_lt= np.array([-1, 1, -1 ])*half + t
         #front right top #2
-        f_rt= np.array([1, 1, -1 ])*size + t 
+        f_rt= np.array([1, 1, -1 ])*half + t 
         #front right bottom #3 
-        f_rb= np.array([1, -1, -1 ])*size + t 
+        f_rb= np.array([1, -1, -1 ])*half + t 
         #back left bottom #4
-        b_lb= np.array([-1, -1, 1 ])*size + t 
+        b_lb= np.array([-1, -1, 1 ])*half + t 
         #front left top #5
-        b_lt= np.array([-1, 1, 1 ])*size + t 
+        b_lt= np.array([-1, 1, 1 ])*half + t 
         #front right top #6
-        b_rt= np.array([1, 1, 1 ])*size + t 
+        b_rt= np.array([1, 1, 1 ])*half + t 
         #front right bottom #7 
-        b_rb= np.array([1, -1, 1 ])*size + t 
+        b_rb= np.array([1, -1, 1 ])*half + t 
         indices = \
         [ 
             # front
@@ -511,8 +584,9 @@ class Renderer3D():
 
 
     def setup_gl_context(self, *args):
-        glEnable(GL_DEPTH_TEST)
-        glDepthFunc(GL_LESS)
+        if self.option["depth_test"]:
+            glEnable(GL_DEPTH_TEST)
+            glDepthFunc(GL_LESS)
         # glEnable(GL_CULL_FACE)
         # glCullFace(GL_BACK)
         # glFrontFace(GL_CCW)
@@ -521,7 +595,8 @@ class Renderer3D():
         pass
 
     def reset_gl_context(self, *args):
-        glDisable(GL_DEPTH_TEST)
+        if self.option["depth_test"]:
+            glDisable(GL_DEPTH_TEST)
         # glDisable(GL_CULL_FACE)
         # kivy default blend function value
         # glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
@@ -582,18 +657,8 @@ class Renderer3D():
                     fmt=[ (b'IN_pos', 3, 'float') ],
                     mode='triangles',
                     )
-        ##
-        # polygon
-        ##
-        vertices=[]
-        indices=[]
-        for vertexes in self.vertexes_list:
-            base = int(len(vertices)/8)
-            vertices +=  vertexes['vertices']
-            for i in vertexes['indices']:
-                indices.append(i+base)
-
         self.renderer.clear()
+
         for linestrip in self.linestrip_list:
             with self.renderer:
                 self.cb = Callback(self.setup_gl_context)
@@ -604,16 +669,47 @@ class Renderer3D():
                     mode='line_strip',
                 )
                 self.cb = Callback(self.reset_gl_context)
-        with self.renderer:
-            self.cb = Callback(self.setup_gl_context)
-            Mesh(
-                vertices = vertices,
-                indices= indices,
-                fmt=self.attr_layout,
-                mode='triangles',
-                )
-            self.cb = Callback(self.reset_gl_context)
+        self.linestrip_list.clear()
+        ##
+        # polygon
+        ##
+        if len(self.vertexes_list) <= 0 : return
+        vertices=[]
+        indices=[]
+        num_of_vertexes = len(self.vertexes_list)
+        vidx = 0
+        while vidx < num_of_vertexes:
+            # for vertexes in self.vertexes_list:
+            while vidx < num_of_vertexes:
+                vertexes = self.vertexes_list[vidx]
+                base = int(len(vertices)/8)
+                if base > 32768: break  
+                vertices +=  vertexes['vertices']
+                for i in vertexes['indices']:
+                    indices.append(i+base)
+                vidx += 1
+            if len(vertices) > 0 :
+                with self.renderer:
+                    self.cb = Callback(self.setup_gl_context)
+                    Mesh(
+                        vertices = vertices,
+                        indices= indices,
+                        fmt=self.attr_layout,
+                        mode='triangles',
+                        )
+                    self.cb = Callback(self.reset_gl_context)
+            vertices.clear()
+            indices.clear()
+        # for vertexes in self.vertexes_list:
+        #     with self.renderer:
+        #         self.cb = Callback(self.setup_gl_context)
+        #         Mesh(
+        #             vertices = vertexes['vertices'],
+        #             indices= vertexes['indices'],
+        #             fmt=self.attr_layout,
+        #             mode='triangles',
+        #             )
+        #         self.cb = Callback(self.reset_gl_context)
 
         self.vertexes_list.clear()
-        self.linestrip_list.clear()
 

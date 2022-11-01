@@ -4,6 +4,7 @@ from kivymd.uix.boxlayout import BoxLayout
 from kivymd.uix.dialog import MDDialog
 from kivymd.uix.label import MDIcon
 from kivymd.uix.scrollview import MDScrollView
+from sympy import lambdify
 from Round2Dtemplate import Round2Dtemplate
 from kivy.core.window import Window
 from kivymd.uix.selectioncontrol import MDSwitch
@@ -355,17 +356,17 @@ class Graph3d(Round2Dtemplate):
         id: f_x_expr 
         hint_text: "x(u, v) = "
         font_size: "20sp"
-        text: "4+(3+cos(v))*sin(u)"
+        text: "(sqrt(2) * (cos(v) * cos(v)) * cos(2*u) + cos(u) * sin(2*v)) / (2 - sqrt(2) * sin(3*u) * sin(2*v))"
     FocusedTextField:
         id: f_y_expr 
         hint_text: "y(u, v) = "
         font_size: "20sp"
-        text: "4+(3+cos(v))*cos(u)"
+        text: "(sqrt(2) * ( cos(v) * cos(v)) * sin(2*u) - sin(u) * sin(2*v)) / (2 - sqrt(2) * sin(3*u) * sin(2*v))"
     FocusedTextField:
         id: f_z_expr 
         hint_text: "z(u, v) = "
         font_size: "20sp"
-        text: "4 + sin(v)"
+        text: "(3 * (cos(v) * cos(v))) / (2 - sqrt(2) * sin(3*u) * sin(2*v))"
     MDBoxLayout:
         spacing: "5dp"
         MDLabel:
@@ -378,12 +379,12 @@ class Graph3d(Round2Dtemplate):
             id: ustart
             hint_text: "from"
             mode: "rectangle"
-            text: "0"
+            text: "-1.5707963267948966"
         FloatInput:
             id: uend
             hint_text: "to"
             mode: "rectangle"
-            text: "6.3"
+            text: "1.5707963267948966"
         FloatInput:
             id: ustep
             hint_text: "step"
@@ -406,7 +407,7 @@ class Graph3d(Round2Dtemplate):
             id: vend
             hint_text: "to"
             mode: "rectangle"
-            text: "6.3"
+            text: "3.141592653589793"
         FloatInput:
             id: vstep
             hint_text: "step"
@@ -548,18 +549,20 @@ class Graph3d(Round2Dtemplate):
             ext=['.csv']
         )
 
-        self.setup_scene()
+        # self.setup_scene()
 
     def set_default(self):
         self.angle = 0.
         self.center: list = [0., 0., 0.]
         self.scale: float = 1.
         self.max_distance = 10.
-        self.mouse = Graph3dline.Mouse()
+        self.mouse = Graph3d.Mouse()
         self.camera = Camera([0., 0., self.max_distance + 1.])
         camera = self.camera
         self.renderer3d.setup_camera(camera.pos, camera.front, camera.up)
+        self.debug_renderer.setup_camera(camera.pos, camera.front, camera.up)
         self.renderer3d.reset_modelview()
+        self.debug_renderer.reset_modelview()
         self.data = None
         
     ##
@@ -624,6 +627,7 @@ class Graph3d(Round2Dtemplate):
         camera.pos[1] = camera.D*math.sin(math.radians(camera.angle[0]))
         camera.pos[2] = camera.D*math.cos(math.radians(camera.angle[1])) * math.cos(math.radians(camera.angle[0]))
         self.renderer3d.setup_camera(camera.pos, camera.front, camera.up)
+        self.debug_renderer.setup_camera(camera.pos, camera.front, camera.up)
         self.gizmo.rotate([camera.angle[0], camera.angle[1], 0])
 
     from  kivy.input.motionevent import MotionEvent
@@ -645,6 +649,7 @@ class Graph3d(Round2Dtemplate):
                 if self.pov < 1. : self.pov = 1.
             else: return False
             self.renderer3d.setup_projection(self.pov, self.width, self.height, self.near, self.far)
+            self.debug_renderer.setup_projection(self.pov, self.width, self.height, self.near, self.far)
             return False
         return False 
 
@@ -667,6 +672,7 @@ class Graph3d(Round2Dtemplate):
         camera.pos[1] = camera.D*math.sin(math.radians(camera.angle[0]))
         camera.pos[2] = camera.D*math.cos(math.radians(camera.angle[1])) * math.cos(math.radians(camera.angle[0]))
         self.renderer3d.setup_camera(camera.pos, camera.front, camera.up)
+        self.debug_renderer.setup_camera(camera.pos, camera.front, camera.up)
         self.gizmo.rotate([camera.angle[0], camera.angle[1], 0])
 
     def on_touch_move(self, touch:MotionEvent):
@@ -701,8 +707,11 @@ class Graph3d(Round2Dtemplate):
         center[2] = (max_list[2] + min_list[2])/2
         self.scale = ratio
         self.renderer3d.reset_modelview()
+        self.debug_renderer.reset_modelview()
         self.renderer3d.translate(-ratio*center[0], -ratio*center[1], -ratio*center[2])
+        self.debug_renderer.translate(-ratio*center[0], -ratio*center[1], -ratio*center[2])
         self.renderer3d.scale(ratio, ratio, ratio)
+        self.debug_renderer.scale(ratio, ratio, ratio)
         self.text_top_left = ( 
                 f'max: [{max_list[0]:.1f}, {max_list[2]:.1f}, {max_list[1]:.1f}]\n' 
                 + f'min: [{min_list[0]:.1f}, {min_list[2]:.1f}, {min_list[1]:.1f}]')
@@ -871,26 +880,17 @@ class Graph3dmesh(Graph3d):
             return False
         self.on_dismiss()
         from sympy.abc import u, v
-        xval = []
-        yval = []
-        zval = []
-        for uval in np.arange(us, ue, ustep):
-            for vval in np.arange(vs, ve, vstep):
-                xval.append(fx.subs([(u, uval), (v, vval)]))
-                yval.append(fy.subs([(u, uval), (v, vval)]))
-                zval.append(fz.subs([(u, uval), (v, vval)]))
+        from mesh import mesh_from_function
+        fx = lambdify([u, v],fx)
+        fy = lambdify([u, v],fy)
+        fz = lambdify([u, v],fz)
+        xval, yval, zval = mesh_from_function(lambda u, v: (
+            fx(u, v),
+            fy(u, v),
+            fz(u, v)
+            ),
+            [us, ue, ustep], [vs, ve, vstep])
 
-                xval.append(fx.subs([(u, uval+ustep), (v, vval)]))
-                yval.append(fy.subs([(u, uval+ustep), (v, vval)]))
-                zval.append(fz.subs([(u, uval+ustep), (v, vval)]))
-
-                xval.append(fx.subs([(u, uval+ustep), (v, vval+vstep)]))
-                yval.append(fy.subs([(u, uval+ustep), (v, vval+vstep)]))
-                zval.append(fz.subs([(u, uval+ustep), (v, vval+vstep)]))
-
-                xval.append(fx.subs([(u, uval), (v, vval+vstep)]))
-                yval.append(fy.subs([(u, uval), (v, vval+vstep)]))
-                zval.append(fz.subs([(u, uval), (v, vval+vstep)]))
         dict = {
                 "x": list(xval),
                 "y": list(yval),
@@ -907,6 +907,7 @@ class Graph3dmesh(Graph3d):
     def eval_func_xy(self, instance):
         from sympy import sympify
         from sympy.abc import x, y
+        from mesh import mesh_from_function
         xval = None
         yval = None
         fval = None
@@ -929,20 +930,15 @@ class Graph3dmesh(Graph3d):
         fval = []
         xval = []
         yval = []
-        for a in np.arange(xs, xe, xstep):
-            for b in np.arange(ys, ye, ystep):
-                xval.append(a)
-                yval.append(b)
-                fval.append(f.subs([ (x, a), (y, b) ]))
-                xval.append(a + xstep)
-                yval.append(b )
-                fval.append(f.subs([ (x, a+xstep), (y, b) ]))
-                xval.append(a + xstep)
-                yval.append(b + ystep)
-                fval.append(f.subs([ (x, a+xstep), (y, b+ystep) ]))
-                xval.append(a)
-                yval.append(b + ystep)
-                fval.append(f.subs([ (x, a), (y, b + ystep) ]))
+        fx = lambdify([x, y],x)
+        fy = lambdify([x, y],y)
+        fz = lambdify([x, y],f)
+        xval, yval, fval = mesh_from_function(lambda x, y: (
+            fx(x, y),
+            fy(x, y),
+            fz(x, y)
+            ),
+            [xs, xe, xstep], [ys, ye, ystep])
         dict = {
                 "x": list(xval),
                 "y": list(yval),
@@ -970,17 +966,14 @@ class Graph3dmesh(Graph3d):
         df = self.data
         colors = Graph3dline.LineColors()
         fill_color = np.array(rgbTocp(colors.getColor()))*255
-        ptlist = []
 
-        # mesh
-        for i in range(0, df.index.size, 4) :
+        ptlist = []
+        for i in range(0, df.index.size, 3) :
             ptlist.clear()
             a = [ df.index[i], df.iat[i, 1], df.iat[i, 0] ]
             b = [ df.index[i+1], df.iat[i+1, 1], df.iat[i+1, 0] ]
             c = [ df.index[i+2], df.iat[i+2, 1], df.iat[i+2, 0] ]
-            d = [ df.index[i+3], df.iat[i+3, 1], df.iat[i+3, 0] ]
             self.renderer3d.drawTriangle(a, c, b, fill_color, [0, 0, 0, 255], None, None)
-            self.renderer3d.drawTriangle(a, d, c, fill_color, [0, 0, 0, 255], None, None)
         self.drawFlushRenderer()
 
 if __name__ == "__main__":

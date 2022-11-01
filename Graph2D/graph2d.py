@@ -222,6 +222,26 @@ class Graph2d(Round2Dtemplate):
             fmt_str += str(f'{y:.1f})')
         return fmt_str
 
+    def find_closest_point(self, df, mx, my) :
+        min_dist = -1.
+        retx, rety = 0., 0.
+        i = 0
+        while i < df.index.size:
+            x = df.index[i] 
+            y = df.values[i][0]
+            dist = (mx - x)*(mx - x) + (my - y)*(my - y)
+            if min_dist < 0 :
+                retx = x
+                rety = y
+                min_dist = dist
+            elif dist < min_dist:
+                retx = x
+                rety = y
+                min_dist = dist
+            i += 1
+        return retx, rety
+
+
     def mouse_pos(self, window, pos):
         x, y = pos
         if(len(self.data) == 0) : return
@@ -230,26 +250,29 @@ class Graph2d(Round2Dtemplate):
             self.mpos = x - self.pos[0]
         viewport = self.view_port
         x_range = self.x_range
+        y_range = self.y_range
         x = x_range[0] + (x_range[1] - x_range[0]) \
                 * (self.mpos - viewport[0])/(viewport[2] - viewport[0])
+        y = y_range[0] + (y_range[1] - y_range[0]) \
+                * (self.mpos - viewport[1])/(viewport[3] - viewport[1])
 
         if (self.mpos >= viewport[0] and self.mpos <= viewport[2]):
             self.update_mouse_tracker(self.mpos)
         dx = x
+        dy = y
         data_str = ""
         i = 0
         for _data in self.data :
             step = (x_range[1] - x_range[0])/_data.index.size
-            df = _data[(_data.index >= dx) & (_data.index < (dx+step))]
-            y=0
+            df = _data[ (_data.index >= (dx-step)) & (_data.index <= (dx+step))]
             if(df.index.size >= 1):
-                x = df.index[0]
-                y = df.values[0][0]
+                x, y = self.find_closest_point(df, dx, dy)
                 if(len(data_str) > 0) : data_str += "\n"
                 self.update_marker(i, x, y)
                 data_str += self.get_disp_format_string(x, y, len(_data.index))
             i += 1
-        self.text_top_right = data_str
+        if len(data_str) > 0 :
+            self.text_top_right = data_str
 
     def calAxis(self, x: list, y: list):
         for val in x:
@@ -409,17 +432,23 @@ class Graph2d(Round2Dtemplate):
         self.kivy_instructions.add(self.tracker_line)
         viewport = self.view_port
         x_range = self.x_range
+        y_range = self.y_range
         dx = x_range[0] + (x_range[1] - x_range[0]) \
                 * (self.mpos - viewport[0])/(viewport[2] - viewport[0])
+        dy = y_range[0] + (y_range[1] - y_range[0]) \
+                * (self.mpos - viewport[1])/(viewport[3] - viewport[1])
         self.kivy_instructions.add(Color(249/255, 253/255, 127/255, 1)) # marker color
         # display a marker at real data point.
         self.tracker_points = []
         for df in self.data :
             step = (x_range[1] - x_range[0])/df.index.size
-            data = df.query('index >='+f'{dx:.5f} and index < '+f'{dx+step:.5f}').iloc[:1]
-            if(len(data) == 1):
-                x = viewport[0] + (data.index[0] - self.x_range[0])*self.r_x
-                y = viewport[1] + (data.values[0][0]- self.y_range[0])*self.r_y
+            data = df.query('index >=' + f'{dx-step:.5f} and ' + 'index <= '+f'{dx+step:.5f}').iloc[:1]
+            if(len(data) > 0):
+                x, y = self.find_closest_point(data, dx, dy)
+                x = viewport[0] + (x - self.x_range[0])*self.r_x
+                y = viewport[1] + (y - self.y_range[0])*self.r_y
+                # x = viewport[0] + (data.index[0] - self.x_range[0])*self.r_x
+                # y = viewport[1] + (data.values[0][0]- self.y_range[0])*self.r_y
                 tracker = Line(circle=(x, y, 5), width = 1)
                 self.tracker_points.append(tracker)
                 self.kivy_instructions.add(tracker)
@@ -438,7 +467,8 @@ class Graph2d(Round2Dtemplate):
         viewport = self.view_port
         x = viewport[0] + (dx - self.x_range[0])*self.r_x
         y = viewport[1] + (dy - self.y_range[0])*self.r_y
-        self.tracker_points[i].circle=(x, y, 5)
+        if i < len(self.tracker_points):
+            self.tracker_points[i].circle=(x, y, 5)
 
     def plot(self):
         self.create_tick(3)

@@ -33,6 +33,7 @@ if __name__ == "__main__":
                 root.nav_drawer.set_state("close")
                 root.screen_manager.current = "3dmesh"
                 root.app_bar.title = "3D Mesh"
+
 MDScreen:
     MDTopAppBar:
         id: app_bar
@@ -193,6 +194,7 @@ MDScreen:
 
     class Gl3dGraphmesh(MDScreen):
         pass
+
     # from kivy.app import App
     from kivymd.app import MDApp
     class graphApp(MDApp):
